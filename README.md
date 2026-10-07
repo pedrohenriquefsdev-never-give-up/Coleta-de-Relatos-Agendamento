@@ -112,4 +112,4 @@ settings/{settingId}
 - Integração VTCall
 - Histórico detalhado por placa/cliente
 - Dashboard de indicadores
-- Notificações e confirmação de agendamento
+- Notificações e confirmação de agendamento.
