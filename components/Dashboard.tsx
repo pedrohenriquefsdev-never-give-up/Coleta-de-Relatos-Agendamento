@@ -23,6 +23,7 @@ export default function Dashboard(){
  const start=useMemo(()=>addDays(startOfWeek(new Date(),{weekStartsOn:1}),weekOffset*7),[weekOffset]); const days=useMemo(()=>Array.from({length:7},(_,i)=>addDays(start,i)),[start]);
  const filtered=appointments.filter(a=>`${a.plate} ${a.fullName} ${a.phone}`.toLowerCase().includes(search.toLowerCase()));
  const today=format(new Date(),"yyyy-MM-dd"); const todayItems=appointments.filter(a=>a.date===today&&a.status!=="cancelado"); const confirmed=appointments.filter(a=>a.date===today&&a.status==="confirmado").length; const completed=appointments.filter(a=>a.date===today&&a.status==="atendido").length;
+ if (!profile) return <div className="loading"><div className="spinner" /></div>;
  function body(){
   if(tab==="usuarios") return profile.role==="admin"?<UserManager/>:<div className="panel"><div className="empty">Apenas administradores podem gerenciar usuários.</div></div>;
   if(tab==="perfil") return <ProfilePanel/>;
