@@ -1,6 +1,6 @@
 # Agenda GPV — V1
 
-Web app de agendamento com calendário, usuários internos, logs de auditoria e foto de perfil via ImageKit.
+Web app de agendamento com calendário, usuários internos, logs de auditoria e foto de perfil via ImageKit
 
 ## Stack
 - Next.js 16 / React 19
