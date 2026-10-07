@@ -1,6 +1,6 @@
 {
-  "name": "agenda-gpv-v1",
-  "version": "0.1.0",
+  "name": "portal-coleta-relatos",
+  "version": "1.1.0",
   "private": true,
   "scripts": {
     "dev": "next dev",
@@ -10,7 +10,6 @@
     "bootstrap-admin": "node scripts/bootstrap-admin.mjs"
   },
   "dependencies": {
-    "@imagekit/next": "^2.1.6",
     "date-fns": "^4.4.0",
     "firebase": "^12.19.0",
     "firebase-admin": "^14.5.0",
