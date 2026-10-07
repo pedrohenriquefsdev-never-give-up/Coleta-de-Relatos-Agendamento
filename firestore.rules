@@ -1,0 +1,34 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    function signedIn() { return request.auth != null; }
+    function userDoc() { return get(/databases/$(database)/documents/users/$(request.auth.uid)); }
+    function active() { return signedIn() && userDoc().data.active == true; }
+    function admin() { return active() && userDoc().data.role == 'admin'; }
+    function canEdit() { return active() && (userDoc().data.role == 'admin' || userDoc().data.role == 'atendente'); }
+
+    match /users/{uid} {
+      allow read: if active();
+      allow create, delete: if false; // somente Firebase Admin SDK
+      allow update: if admin() || (active() && request.auth.uid == uid &&
+        request.resource.data.diff(resource.data).affectedKeys().hasOnly(['photoUrl','updatedAt','lastAccessAt']));
+    }
+
+    match /appointments/{id} {
+      allow read: if active();
+      allow create, update: if canEdit();
+      allow delete: if admin();
+    }
+
+    match /auditLogs/{id} {
+      allow read: if admin();
+      allow create: if active() && request.resource.data.userId == request.auth.uid;
+      allow update, delete: if false;
+    }
+
+    match /settings/{id} {
+      allow read: if active();
+      allow write: if admin();
+    }
+  }
+}

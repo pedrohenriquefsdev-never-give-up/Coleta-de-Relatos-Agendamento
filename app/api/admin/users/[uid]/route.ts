@@ -1,0 +1,7 @@
+import { NextRequest } from "next/server";
+import { FieldValue } from "firebase-admin/firestore";
+import { adminAuth, adminDb } from "@/lib/firebase-admin";
+
+async function requireAdmin(req:NextRequest){const h=req.headers.get("authorization");if(!h?.startsWith("Bearer "))throw new Error("UNAUTHORIZED");const decoded=await adminAuth().verifyIdToken(h.slice(7));const snap=await adminDb().collection("users").doc(decoded.uid).get();if(!snap.exists||snap.data()?.role!=="admin"||snap.data()?.active===false)throw new Error("FORBIDDEN");return {uid:decoded.uid,...snap.data()} as any}
+
+export async function PATCH(req:NextRequest,{params}:{params:Promise<{uid:string}>}){try{const actor=await requireAdmin(req);const {uid}=await params;const body=await req.json();if(typeof body.active!=="boolean")return Response.json({error:"Valor inválido."},{status:400});if(uid===actor.uid&&body.active===false)return Response.json({error:"Você não pode bloquear seu próprio acesso."},{status:400});await adminAuth().updateUser(uid,{disabled:!body.active});await adminDb().collection("users").doc(uid).update({active:body.active,updatedAt:FieldValue.serverTimestamp()});await adminDb().collection("auditLogs").add({userId:actor.uid,userName:actor.name,userEmail:actor.email,action:"USER_UPDATED",targetId:uid,details:{active:body.active},createdAt:FieldValue.serverTimestamp()});return Response.json({ok:true});}catch(e:any){const status=e?.message==="UNAUTHORIZED"?401:e?.message==="FORBIDDEN"?403:500;return Response.json({error:"Não foi possível alterar o usuário."},{status})}}
