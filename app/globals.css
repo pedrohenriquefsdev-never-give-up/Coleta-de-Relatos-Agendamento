@@ -871,3 +871,32 @@
     min-height:0!important;
   }
 }
+
+/* V1.12 final spacing correction for lower microcard */
+.v18-microcards{
+  min-height:318px!important;
+}
+.v18-microcard.card-c{
+  top:214px!important;
+  left:98px!important;
+}
+.cluster-b{top:232px!important;left:166px!important}
+.cluster-c{top:248px!important;left:386px!important}
+
+@media(max-height:800px) and (min-width:981px){
+  .v18-microcards{
+    min-height:300px!important;
+  }
+  .v18-microcard.card-c{
+    top:198px!important;
+    left:88px!important;
+  }
+  .cluster-b{top:214px!important;left:148px!important}
+  .cluster-c{top:232px!important;left:354px!important}
+}
+
+@media(max-width:1180px){
+  .v18-microcards{
+    min-height:0!important;
+  }
+}
