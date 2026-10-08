@@ -318,7 +318,7 @@ export default function Dashboard() {
     <div className="shell">
       <aside className="sidebar">
         <div className="brand">
-          <span className="brand-mark">CR</span>
+          <span className="brand-mark image-mark"><img src="/assets/app-symbol.png" alt="Ícone do aplicativo" /></span>
           <div>
             <strong>Portal Coleta</strong>
             <small>de Relatos</small>

@@ -1,7 +1,7 @@
 "use client";
 
 import { signInWithEmailAndPassword } from "firebase/auth";
-import { ArrowRight, LockKeyhole, Mail, ShieldCheck, CalendarClock, CarFront } from "lucide-react";
+import { ArrowRight, CalendarClock, LockKeyhole, Mail, ShieldCheck, UsersRound } from "lucide-react";
 import { useSearchParams, useRouter } from "next/navigation";
 import { FormEvent, Suspense, useState } from "react";
 import { auth } from "@/lib/firebase";
@@ -30,17 +30,19 @@ function LoginForm() {
   }
 
   return (
-    <div className="login-card upgraded">
-      <div className="login-card-head">
-        <div>
+    <div className="login-card upgraded gpv">
+      <div className="login-card-head gpv">
+        <div className="login-head-copy">
           <div className="login-kicker">ACESSO INTERNO</div>
           <h2>Entrar no portal</h2>
           <p>Use seu e-mail cadastrado e o CPF para acessar o ambiente interno.</p>
         </div>
-        <Plate value="BRA2E19" compact />
+        <div className="login-plate-right">
+          <Plate value="GPV Associados" wide />
+        </div>
       </div>
 
-      <div className="login-tip">
+      <div className="login-tip gpv">
         <ShieldCheck size={16} />
         <span>Acesso restrito à equipe autorizada.</span>
       </div>
@@ -76,8 +78,8 @@ function LoginForm() {
           <span>Agendamentos centralizados</span>
         </div>
         <div>
-          <CarFront size={16} />
-          <span>Placas e veículos em destaque</span>
+          <UsersRound size={16} />
+          <span>Atendimento e operação conectados</span>
         </div>
       </div>
     </div>
@@ -87,37 +89,46 @@ function LoginForm() {
 export default function LoginPage() {
   return (
     <div className="login-page">
-      <section className="login-visual upgraded">
-        <div className="login-brand">
-          <span className="brand-mark">CR</span>
+      <section className="login-visual upgraded gpv-visual">
+        <img src="/assets/gpv-symbol.png" alt="Símbolo GPV" className="bg-logo watermark-one" />
+        <img src="/assets/gpv-truck.png" alt="GPV Truck" className="bg-logo watermark-two" />
+        <img src="/assets/app-symbol.png" alt="Símbolo do aplicativo" className="bg-logo watermark-symbol" />
+
+        <div className="login-brand gpv-brand">
+          <span className="brand-mark image-mark"><img src="/assets/app-symbol.png" alt="Ícone do aplicativo" /></span>
           <div>
             <strong>Portal Coleta de Relatos</strong>
             <small>Operação e atendimento</small>
           </div>
         </div>
 
-        <div className="login-art upgraded">
+        <div className="login-art upgraded gpv-art">
           <div className="login-copy">
             <span>GESTÃO INTERNA</span>
-            <h1>Agendamentos, relatos e atendimento com uma visualização mais clara.</h1>
-            <p>Organize a agenda, acompanhe veículos e mantenha cada etapa do contato registrada em um só lugar.</p>
-            <div className="login-bullets">
-              <div><ShieldCheck size={16} /><span>Acesso seguro para a equipe</span></div>
-              <div><CalendarClock size={16} /><span>Agenda semanal organizada</span></div>
-              <div><CarFront size={16} /><span>Visual com foco em veículos e placas</span></div>
+            <h1>Agendamentos, relatos e atendimento com mais clareza operacional.</h1>
+            <p>Uma visão interna para acompanhar contatos, veículos e registros com uma identidade conectada à GPV Associados.</p>
+            <div className="login-bullets gpv-bullets">
+              <div><UsersRound size={16} /><span>Equipe, operação e atendimento integrados</span></div>
+              <div><CalendarClock size={16} /><span>Agenda semanal organizada para a rotina</span></div>
+              <div><ShieldCheck size={16} /><span>Ambiente interno estruturado para controle</span></div>
             </div>
           </div>
 
-          <div className="car-stage upgraded">
-            <div className="car-card-shell">
-              <div className="car-card-top">
-                <span>VISÃO RÁPIDA</span>
-                <span>PORTAL INTERNO</span>
+          <div className="login-graphic-board">
+            <div className="login-graphic-surface">
+              <div className="board-topline">
+                <span>VISÃO TÉCNICA</span>
+                <span>GPV ASSOCIADOS</span>
               </div>
-              <div className="car-card-main">
-                <div className="car-glow" />
-                <img src="/login-vehicle.png" alt="Veículo" className="login-car" />
-                <div className="login-plate"><Plate value="BRA2E19" /></div>
+              <div className="tech-lines" />
+              <img src="/assets/tech-car.png" alt="Diagrama técnico do carro" className="tech-car-art" />
+              <div className="graphic-badge badge-one">
+                <img src="/assets/app-symbol.png" alt="Símbolo do aplicativo" />
+                <span>Operação conectada</span>
+              </div>
+              <div className="graphic-badge badge-two">
+                <img src="/assets/gpv-symbol.png" alt="Símbolo GPV" />
+                <span>Identidade GPV</span>
               </div>
             </div>
           </div>
@@ -129,8 +140,11 @@ export default function LoginPage() {
         </div>
       </section>
 
-      <section className="login-panel upgraded">
+      <section className="login-panel upgraded gpv-panel">
         <div className="login-panel-wrap">
+          <div className="login-panel-brand">
+            <img src="/assets/gpv-logo-yellow.jpg" alt="GPV Associados" />
+          </div>
           <Suspense fallback={<div className="spinner" />}>
             <LoginForm />
           </Suspense>
