@@ -1,7 +1,7 @@
 "use client";
 
 import { signInWithEmailAndPassword } from "firebase/auth";
-import { ArrowRight, CalendarClock, FileText, LockKeyhole, Mail, ShieldCheck, UsersRound } from "lucide-react";
+import { ArrowRight, CalendarClock, ChevronRight, FileText, LockKeyhole, Mail, ShieldCheck, UsersRound } from "lucide-react";
 import { useSearchParams, useRouter } from "next/navigation";
 import { FormEvent, Suspense, useState } from "react";
 import { auth } from "@/lib/firebase";
@@ -30,7 +30,7 @@ function LoginForm() {
   }
 
   return (
-    <div className="login-card minimal gpv-clean">
+    <div className="login-card minimal gpv-clean v17-login-card">
       <div className="login-card-topline">
         <div>
           <div className="login-kicker">ACESSO INTERNO</div>
@@ -71,7 +71,7 @@ function LoginForm() {
         </button>
       </form>
 
-      <div className="login-mini-features">
+      <div className="login-mini-features v17-login-mini-features">
         <div><CalendarClock size={16} /> <span>Agenda organizada</span></div>
         <div><UsersRound size={16} /> <span>Operação integrada</span></div>
       </div>
@@ -81,15 +81,15 @@ function LoginForm() {
 
 export default function LoginPage() {
   return (
-    <div className="login-page clean-layout v15-layout">
-      <section className="login-visual v15-visual">
-        <div className="v15-grid" />
-        <div className="v15-glow glow-a" />
-        <div className="v15-glow glow-b" />
-        <div className="v15-orbit orbit-a" />
-        <div className="v15-orbit orbit-b" />
+    <div className="login-page clean-layout v15-layout v17-layout">
+      <section className="login-visual v15-visual v17-visual">
+        <div className="v15-grid v17-grid" />
+        <div className="v15-glow glow-a v17-glow-a" />
+        <div className="v15-glow glow-b v17-glow-b" />
+        <div className="v15-orbit orbit-a v17-orbit-a" />
+        <div className="v15-orbit orbit-b v17-orbit-b" />
 
-        <div className="login-brand clean-brand v15-brand">
+        <div className="login-brand clean-brand v15-brand v17-brand">
           <span className="brand-mark image-mark"><img src="/assets/app-symbol.png" alt="Ícone do aplicativo" /></span>
           <div>
             <strong>Portal Coleta de Relatos</strong>
@@ -97,49 +97,54 @@ export default function LoginPage() {
           </div>
         </div>
 
-        <div className="v15-copy-block">
+        <div className="v15-copy-block v17-copy-block">
           <span className="clean-eyebrow">GESTÃO INTERNA</span>
-          <h1>Controle interno com mais clareza.</h1>
-          <p>Agendamentos, contatos e registros reunidos em um só portal.</p>
+          <h1>Controle interno<br/>com mais<br/>clareza<span className="headline-dot">.</span></h1>
         </div>
 
-        <div className="v16-microcards" aria-hidden="true">
-          <div className="v16-microcard card-a">
-            <span className="micro-icon"><CalendarClock size={16} /></span>
-            <div>
+        <div className="v16-microcards v17-microcards" aria-hidden="true">
+          <div className="v16-microcard v17-microcard card-a">
+            <span className="micro-icon"><CalendarClock size={18} /></span>
+            <div className="micro-content">
               <strong>Agendamentos</strong>
-              <small>Organize e acompanhe a agenda interna.</small>
+              <small>Organize e acompanhe<br/>as demandas.</small>
             </div>
+            <span className="micro-arrow"><ChevronRight size={18} /></span>
           </div>
-          <div className="v16-microcard card-b">
-            <span className="micro-icon"><FileText size={16} /></span>
-            <div>
+          <div className="v16-microcard v17-microcard card-b">
+            <span className="micro-icon"><FileText size={18} /></span>
+            <div className="micro-content">
               <strong>Relatos</strong>
-              <small>Registre e consulte informações com agilidade.</small>
+              <small>Registre e consulte<br/>informações.</small>
             </div>
+            <span className="micro-arrow"><ChevronRight size={18} /></span>
           </div>
-          <div className="v16-microcard card-c">
-            <span className="micro-icon"><UsersRound size={16} /></span>
-            <div>
+          <div className="v16-microcard v17-microcard card-c">
+            <span className="micro-icon"><UsersRound size={18} /></span>
+            <div className="micro-content">
               <strong>Operação</strong>
-              <small>Equipe conectada para uma rotina mais clara.</small>
+              <small>Equipes conectadas<br/>para mais resultado.</small>
             </div>
+            <span className="micro-arrow"><ChevronRight size={18} /></span>
           </div>
+          <div className="dot-cluster cluster-a" />
+          <div className="dot-cluster cluster-b" />
+          <div className="dot-cluster cluster-c" />
         </div>
 
-        <div className="v15-feature-stack">
+        <div className="v15-feature-stack v17-feature-stack">
           <div><UsersRound size={16} /><span>Equipe, operação e atendimento conectados</span></div>
           <div><CalendarClock size={16} /><span>Visão organizada da agenda interna</span></div>
           <div><ShieldCheck size={16} /><span>Ambiente interno com acesso controlado</span></div>
         </div>
 
-        <div className="login-footer clean-footer v15-footer">
+        <div className="login-footer clean-footer v15-footer v17-footer">
           <span>Portal Coleta de Relatos</span>
           <span>Uso interno</span>
         </div>
       </section>
 
-      <section className="login-panel clean-panel v15-panel">
+      <section className="login-panel clean-panel v15-panel v17-panel">
         <div className="login-panel-wrap clean-wrap">
           <Suspense fallback={<div className="spinner" />}>
             <LoginForm />

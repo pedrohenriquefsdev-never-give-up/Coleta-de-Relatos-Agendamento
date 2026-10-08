@@ -281,3 +281,93 @@
 @media(max-width:980px){
   .v16-microcards{width:100%;max-width:none}
 }
+
+/* V1.7 fidelity pass based on approved mockup */
+.v17-layout{background:#080908}
+.v17-visual{padding:30px 30px 24px;background:
+  radial-gradient(circle at 23% 41%, rgba(245,192,0,.16) 0%, rgba(245,192,0,.07) 12%, transparent 25%),
+  radial-gradient(circle at 82% 14%, rgba(245,192,0,.10) 0%, rgba(245,192,0,.04) 14%, transparent 32%),
+  radial-gradient(circle at 74% 80%, rgba(245,192,0,.13) 0%, rgba(245,192,0,.06) 11%, transparent 26%),
+  linear-gradient(140deg,#070807 0%,#0c0d0b 48%,#11120e 100%)}
+.v17-grid{background-image:linear-gradient(rgba(255,255,255,.022) 1px, transparent 1px),linear-gradient(90deg, rgba(255,255,255,.022) 1px, transparent 1px);background-size:64px 64px;mask-image:none;opacity:.40}
+.v17-glow-a{left:10%;top:18%;width:360px;height:360px;filter:blur(26px)}
+.v17-glow-b{right:14%;bottom:6%;width:320px;height:320px;filter:blur(24px)}
+.v17-orbit-a{width:540px;height:540px;left:-170px;bottom:-170px;border-color:rgba(245,192,0,.24)}
+.v17-orbit-b{width:410px;height:410px;right:255px;top:55px;border-color:rgba(245,192,0,.28)}
+.v17-brand{gap:14px}
+.v17-brand .image-mark{box-shadow:0 0 0 1px rgba(255,255,255,.12),0 0 24px rgba(245,192,0,.20)}
+.v17-copy-block{margin-top:140px;max-width:460px}
+.v17-copy-block h1{font-size:88px;line-height:.92;letter-spacing:-.07em;max-width:470px;margin:0;color:#fff;text-shadow:0 2px 10px rgba(0,0,0,.20)}
+.v17-copy-block .headline-dot{color:var(--yellow)}
+.v17-microcards{right:140px;top:160px;width:450px;min-height:340px;display:block}
+.v17-microcard{position:absolute;width:260px;gap:16px;align-items:center;padding:22px 22px;border-radius:22px;background:linear-gradient(135deg,rgba(29,30,28,.90),rgba(18,19,17,.82));border:1px solid rgba(255,255,255,.10);box-shadow:0 18px 36px rgba(0,0,0,.25), inset 0 1px 0 rgba(255,255,255,.05);backdrop-filter:blur(10px)}
+.v17-microcard .micro-icon{width:56px;height:56px;border-radius:16px;background:linear-gradient(180deg,rgba(0,0,0,.76),rgba(5,5,4,.92));border:1px solid rgba(255,208,0,.10);box-shadow:inset 0 1px 0 rgba(255,255,255,.04)}
+.v17-microcard .micro-content{flex:1;min-width:0}
+.v17-microcard strong{font-size:17px;margin-bottom:6px}
+.v17-microcard small{font-size:13px;line-height:1.5;color:#d0d2cb}
+.v17-microcard .micro-arrow{color:var(--yellow);display:grid;place-items:center;flex-shrink:0;opacity:.95}
+.v17-microcard.card-a{top:0;left:44px;transform:rotate(1deg)}
+.v17-microcard.card-b{top:115px;left:200px;transform:rotate(1.2deg)}
+.v17-microcard.card-c{top:245px;left:38px;transform:rotate(-0.2deg)}
+.v17-microcard.card-a,.v17-microcard.card-b,.v17-microcard.card-c{margin-left:0}
+.v17-microcard:hover{transform:translateY(-3px) scale(1.01);border-color:rgba(245,192,0,.36);box-shadow:0 0 0 1px rgba(245,192,0,.22),0 0 28px rgba(245,192,0,.20),0 18px 38px rgba(0,0,0,.25);background:linear-gradient(135deg,rgba(37,38,35,.92),rgba(22,23,21,.86))}
+.v17-microcard.card-a:hover{transform:rotate(1deg) translateY(-3px) scale(1.01)}
+.v17-microcard.card-b:hover{transform:rotate(1.2deg) translateY(-3px) scale(1.01)}
+.v17-microcard.card-c:hover{transform:rotate(-.2deg) translateY(-3px) scale(1.01)}
+.v17-microcard:hover .micro-icon{background:linear-gradient(180deg,rgba(0,0,0,.84),rgba(5,5,4,.98));filter:drop-shadow(0 0 10px rgba(245,192,0,.25));border-color:rgba(245,192,0,.22)}
+.dot-cluster{position:absolute;width:62px;height:62px;background-image:radial-gradient(circle, rgba(245,192,0,.75) 1.2px, transparent 1.3px);background-size:15px 15px;opacity:.9}
+.cluster-a{top:54px;left:315px}
+.cluster-b{top:192px;left:95px}
+.cluster-c{top:284px;left:358px}
+.v17-feature-stack{left:30px;right:auto;bottom:72px;gap:14px;max-width:610px;width:610px}
+.v17-feature-stack>div{padding:18px 22px;border-radius:18px;background:linear-gradient(90deg,rgba(24,25,23,.85),rgba(18,19,17,.70));border:1px solid rgba(255,255,255,.09);box-shadow:inset 0 1px 0 rgba(255,255,255,.03)}
+.v17-feature-stack>div svg{width:22px;height:22px}
+.v17-feature-stack>div span{font-size:15px}
+.v17-footer{font-size:14px;color:#989993;left:30px;right:30px;bottom:26px}
+
+.v17-panel{padding:22px 26px;background:
+  radial-gradient(circle at 52% 0%, rgba(245,192,0,.08), transparent 30%),
+  linear-gradient(180deg,#11120f 0%,#0f100d 100%)}
+.v17-panel .login-panel-wrap{width:min(480px,100%)}
+.v17-login-card{width:min(470px,100%);padding:30px 28px 24px;border-radius:32px;border-color:rgba(255,255,255,.10);box-shadow:0 0 0 1px rgba(255,255,255,.02),0 16px 60px rgba(0,0,0,.22), inset 0 1px 0 rgba(255,255,255,.03);background:linear-gradient(180deg,rgba(15,16,13,.96),rgba(12,13,10,.95))}
+.v17-login-card .login-card-topline{margin-bottom:16px;align-items:flex-start}
+.v17-login-card .login-card-topline h2{font-size:62px;line-height:.96;max-width:230px}
+.v17-login-card .login-intro{font-size:16px;max-width:360px;margin-bottom:20px;color:#b8b9b2}
+.v17-login-card .login-tip.clean{padding:14px 16px;border-radius:16px;margin-bottom:18px;background:rgba(245,192,0,.11);border-color:rgba(245,192,0,.34);font-size:13px}
+.v17-login-card .field label{font-size:14px;margin-bottom:8px;color:#fff}
+.v17-login-card .input{min-height:58px;border-radius:15px;font-size:15px}
+.v17-login-card .btn.primary{min-height:62px;border-radius:16px;font-size:18px;box-shadow:0 12px 32px rgba(245,192,0,.16)}
+.v17-login-mini-features{margin-top:18px;gap:14px}
+.v17-login-mini-features>div{padding:14px 16px;border-radius:16px;font-size:13px;background:rgba(20,21,18,.82)}
+
+@media(max-width:1380px){
+  .v17-copy-block h1{font-size:78px}
+  .v17-microcards{right:92px;top:170px;transform:scale(.95);transform-origin:top right}
+  .v17-orbit-b{right:215px}
+}
+@media(max-width:1280px){
+  .v17-copy-block{margin-top:118px}
+  .v17-copy-block h1{font-size:72px;max-width:420px}
+  .v17-microcards{right:56px;top:182px;transform:scale(.88)}
+  .v17-feature-stack{width:520px;max-width:520px}
+  .v17-login-card .login-card-topline h2{font-size:54px}
+}
+@media(max-width:1180px){
+  .v17-microcards{position:relative;right:auto;top:auto;transform:none;width:100%;min-height:0;display:grid;gap:14px;margin:24px 0 8px}
+  .v17-microcard{position:relative!important;left:auto!important;top:auto!important;transform:none!important;width:100%}
+  .dot-cluster{display:none}
+  .v17-feature-stack{position:static;width:100%;max-width:none;margin-top:28px}
+  .v17-copy-block{margin-top:56px}
+  .v17-copy-block h1{font-size:58px}
+  .v17-panel .login-panel-wrap{width:min(540px,100%)}
+}
+@media(max-width:980px){
+  .v17-visual{padding-bottom:28px}
+  .v17-orbit-b{right:-60px;top:80px}
+  .v17-footer{position:static;margin-top:24px}
+}
+@media(max-width:700px){
+  .v17-copy-block h1{font-size:44px}
+  .v17-login-card .login-card-topline h2{font-size:42px;max-width:none}
+  .v17-login-card{padding:24px 20px 20px}
+}
