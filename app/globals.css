@@ -1438,3 +1438,23 @@
     bottom:10px!important;
   }
 }
+
+/* V1.20 - final title balance */
+.v18-copy-block{
+  padding-top:0!important;
+  transform:translateY(-14px)!important;
+}
+.v18-copy-block h1{
+  font-size:clamp(46px,4.0vw,56px)!important;
+  max-width:400px!important;
+}
+
+@media(max-height:820px) and (min-width:981px){
+  .v18-copy-block{
+    transform:translateY(-16px)!important;
+  }
+  .v18-copy-block h1{
+    font-size:clamp(44px,3.9vw,54px)!important;
+    max-width:390px!important;
+  }
+}
