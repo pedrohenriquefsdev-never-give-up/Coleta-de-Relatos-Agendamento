@@ -44,7 +44,14 @@ export async function POST(req: NextRequest) {
     if (!response.ok || !payload.secure_url) return Response.json({ error: payload.error?.message || "Falha no upload" }, { status: 500 });
 
     return Response.json({ url: payload.secure_url });
-  } catch {
-    return Response.json({ error: "Não foi possível enviar a imagem." }, { status: 500 });
+  } catch (e: any) {
+    const message = String(e?.message || "");
+    const error =
+      message.includes("Firebase Admin não configurado")
+        ? message
+        : message.includes("PRIVATE_KEY") || message.includes("private key") || message.includes("DECODER routines")
+          ? "A chave privada do Firebase Admin está inválida ou foi colada com formatação incorreta na Vercel."
+          : "Não foi possível enviar a imagem.";
+    return Response.json({ error, code: e?.code || undefined }, { status: 500 });
   }
 }

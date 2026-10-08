@@ -18,9 +18,12 @@ export default function ProfilePanel(){
    const token=await auth.currentUser?.getIdToken();
    const body=new FormData(); body.append("file",file);
    const res=await fetch("/api/cloudinary-upload",{method:"POST",headers:{Authorization:`Bearer ${token}`},body});
-   const result=await res.json(); if(!res.ok||!result.url)throw new Error(result.error||"Falha ao enviar imagem");
+   const raw=await res.text();
+   let result:any={};
+   if(raw){try{result=JSON.parse(raw)}catch{result={error:`Resposta inválida do servidor (HTTP ${res.status}).`}}}
+   if(!res.ok||!result.url)throw new Error(result.error||`Falha ao enviar imagem (HTTP ${res.status})`);
    await updateDoc(doc(db,"users",user.uid),{photoUrl:result.url,updatedAt:serverTimestamp()});
-   await addDoc(collection(db,"auditLogs"),{userId:user.uid,userName:currentProfile.name,userEmail:currentProfile.email,action:"PROFILE_PHOTO_UPDATED",createdAt:serverTimestamp()});
+   addDoc(collection(db,"auditLogs"),{userId:user.uid,userName:currentProfile.name,userEmail:currentProfile.email,action:"PROFILE_PHOTO_UPDATED",createdAt:serverTimestamp()}).catch(()=>undefined);
    setPhoto(result.url);setMessage("Foto atualizada com sucesso.");
   }catch(e){setMessage(e instanceof Error?e.message:"Erro no upload")}finally{setLoading(false)}
  }

@@ -108,7 +108,7 @@ export default function UserManager() {
         body: JSON.stringify({ department }),
       });
       const data = await readJsonSafe(res);
-      if (!res.ok) throw new Error(`Perfil: ${data.error || `falha HTTP ${res.status}`}`);
+      if (!res.ok) throw new Error(`Perfil: ${data.error || `falha HTTP ${res.status}`}. Verifique as variáveis FIREBASE_ADMIN_* na Vercel.`);
       if (wantsVTCall) {
         try {
           await saveVTCallFor(editing.uid);

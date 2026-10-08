@@ -4,6 +4,7 @@ import { adminDb } from "@/lib/firebase-admin";
 import { encryptSecret, decryptSecret } from "@/lib/vtcall-crypto";
 import { requireAdmin } from "@/lib/server-auth";
 
+export const runtime = "nodejs";
 function clean(body: any) {
   const host = String(body.host || "").trim();
   const extension = String(body.extension || "").trim();

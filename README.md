@@ -47,3 +47,17 @@ Nunca envie a chave privada do Firebase Admin ou o API Secret do Cloudinary para
 
 ## Primeiro acesso
 O login usa e-mail + CPF configurados no Firebase Authentication. O documento correspondente deve existir em `users/{UID}` no Firestore com `active: true` e um dos perfis: `admin`, `atendente` ou `consulta`.
+
+
+## Diagnóstico Firebase Admin (V1.26)
+
+Se rotas administrativas ou o upload de foto retornarem HTTP 500, verifique na Vercel:
+
+- `FIREBASE_ADMIN_PROJECT_ID`
+- `FIREBASE_ADMIN_CLIENT_EMAIL`
+- `FIREBASE_ADMIN_PRIVATE_KEY`
+
+A chave privada pode ser colada com `\n` literais ou como PEM multilinha; a V1.26 normaliza ambos.
+Também há suporte opcional a `FIREBASE_SERVICE_ACCOUNT_KEY` com o JSON completo da conta de serviço.
+
+Depois de alterar Environment Variables, faça um novo deploy.

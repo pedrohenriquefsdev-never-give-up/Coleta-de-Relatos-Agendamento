@@ -3,6 +3,7 @@ import { FieldValue } from "firebase-admin/firestore";
 import { adminAuth, adminDb } from "@/lib/firebase-admin";
 import { requireAdmin } from "@/lib/server-auth";
 
+export const runtime = "nodejs";
 function safeServerError(e: any) {
   const message = String(e?.message || "");
   const code = String(e?.code || "");
