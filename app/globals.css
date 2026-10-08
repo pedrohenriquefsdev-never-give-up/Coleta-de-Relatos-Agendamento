@@ -1680,3 +1680,72 @@
   .sidebar-profile-card{margin-top:12px;padding:12px 10px}
   .sidebar-profile-photo{width:76px;height:76px;border-radius:20px}
 }
+
+/* V1.23 - VTCall as an internal module */
+.vt-page{gap:18px}
+.vt-page-hero{
+  display:flex;
+  align-items:center;
+  justify-content:space-between;
+  gap:22px;
+  padding:22px 24px;
+  border:1px solid var(--line);
+  border-radius:22px;
+  background:linear-gradient(135deg,rgba(244,196,0,.07),rgba(255,255,255,.018) 45%,rgba(255,255,255,.012));
+}
+.vt-page-hero h2{margin:5px 0 6px;font-size:30px;letter-spacing:-.03em}
+.vt-page-hero p{margin:0;color:var(--muted);font-size:13px;line-height:1.5;max-width:620px}
+.vt-page-download{min-height:44px;white-space:nowrap}
+.vt-page-main-grid{
+  display:grid;
+  grid-template-columns:minmax(0,1.2fr) minmax(320px,.8fr);
+  gap:18px;
+}
+.vt-page-guide-card,.vt-page-credentials-card,.vt-page-steps-card{
+  border:1px solid var(--line);
+  border-radius:20px;
+  background:var(--surface);
+  padding:18px;
+}
+.vt-page-section-head{display:flex;align-items:flex-start;gap:11px;margin-bottom:14px}
+.vt-page-section-head.compact{margin-bottom:12px}
+.vt-page-section-head h3{margin:0 0 4px;font-size:15px}
+.vt-page-section-head p{margin:0;color:var(--muted);font-size:11px;line-height:1.5}
+.vt-page-icon{
+  width:36px;height:36px;border-radius:11px;display:grid;place-items:center;flex-shrink:0;
+  color:var(--yellow);background:rgba(244,196,0,.08);border:1px solid rgba(244,196,0,.16)
+}
+.vt-page-guide-image-wrap{
+  border-radius:16px;
+  overflow:hidden;
+  border:1px solid #30312e;
+  background:#f3f3f3;
+  box-shadow:0 12px 30px rgba(0,0,0,.14);
+}
+.vt-page-guide-image-wrap img{display:block;width:100%;height:auto}
+.vt-page-caption{margin-top:9px;color:var(--muted);font-size:9.5px}
+.vt-page-copy-list{display:grid;gap:9px}
+.vt-page-copy-row{
+  display:flex;align-items:center;justify-content:space-between;gap:12px;
+  padding:11px 12px;border:1px solid var(--line);border-radius:13px;background:var(--surface-soft)
+}
+.vt-page-copy-value{display:flex;flex-direction:column;min-width:0}
+.vt-page-copy-value small{font-size:9px;color:var(--muted);text-transform:uppercase;letter-spacing:.06em}
+.vt-page-copy-value strong{margin-top:3px;font-size:12px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.vt-page-copy-actions{display:flex;align-items:center;gap:6px;flex-shrink:0}
+.vt-page-steps{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:10px}
+.vt-page-steps>div{padding:12px;border:1px solid var(--line);border-radius:14px;background:var(--surface-soft);display:flex;align-items:flex-start;gap:9px;min-height:72px}
+.vt-page-steps b{width:24px;height:24px;border-radius:999px;display:grid;place-items:center;background:rgba(244,196,0,.12);color:var(--yellow);font-size:10px;flex-shrink:0}
+.vt-page-steps span{font-size:10.5px;line-height:1.45;color:var(--muted)}
+.vt-page-steps strong{color:var(--text)}
+.sidebar-profile-card{margin-top:30px}
+
+@media(max-width:1180px){
+  .vt-page-main-grid{grid-template-columns:1fr}
+  .vt-page-steps{grid-template-columns:repeat(2,minmax(0,1fr))}
+}
+@media(max-width:760px){
+  .vt-page-hero{align-items:flex-start;flex-direction:column}
+  .vt-page-download{width:100%;justify-content:center}
+  .vt-page-steps{grid-template-columns:1fr}
+}

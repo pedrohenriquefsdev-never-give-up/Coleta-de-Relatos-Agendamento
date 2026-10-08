@@ -30,7 +30,7 @@ import Plate from "./Plate";
 import ProfilePanel from "./ProfilePanel";
 import ThemeToggle from "./ThemeToggle";
 import UserManager from "./UserManager";
-import VTCallSidebarModule from "./VTCallSidebarModule";
+import VTCallPage from "./VTCallPage";
 
 const hours = [
   "08:00",
@@ -70,6 +70,7 @@ const tabLabels: Record<string, string> = {
   usuarios: "Usuários",
   logs: "Logs e auditoria",
   perfil: "Meu perfil",
+  vtcall: "VTCall",
 };
 
 export default function Dashboard() {
@@ -185,6 +186,8 @@ export default function Dashboard() {
     }
 
     if (tab === "perfil") return <ProfilePanel />;
+
+    if (tab === "vtcall") return <VTCallPage />;
 
     if (tab === "logs") {
       return (
@@ -334,9 +337,8 @@ export default function Dashboard() {
           {currentProfile.role === "admin" && <button className={tab === "usuarios" ? "active" : ""} onClick={() => setTab("usuarios")}><Users size={18} /> Usuários</button>}
           <button className={tab === "logs" ? "active" : ""} onClick={() => setTab("logs")}><History size={18} /> Logs</button>
           <button className={tab === "perfil" ? "active" : ""} onClick={() => setTab("perfil")}><UserRound size={18} /> Meu perfil</button>
+          <button className={tab === "vtcall" ? "active" : ""} onClick={() => setTab("vtcall")}><PhoneCall size={18} /> VTCall</button>
         </div>
-
-        <VTCallSidebarModule />
 
         <div className="sidebar-profile-card" onClick={() => setTab("perfil")}>
           {currentProfile.photoUrl ? (
