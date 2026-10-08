@@ -157,3 +157,64 @@
   .login-graphic-surface{padding-bottom:18px}
   .tech-car-art{margin-top:16px}
 }
+
+/* V1.4 login cleanup */
+.clean-layout{background:#0e0f0d}
+.clean-visual{position:relative;isolation:isolate;padding:34px 34px 24px;background:
+  linear-gradient(145deg,#090909 0%,#11120f 52%,#151611 100%);
+  overflow:hidden}
+.clean-bg-glow{position:absolute;inset:auto auto 6% 42%;width:340px;height:340px;border-radius:999px;background:radial-gradient(circle, rgba(244,196,0,.12) 0%, rgba(244,196,0,.05) 28%, transparent 70%);filter:blur(16px);pointer-events:none;z-index:0}
+.clean-watermark{position:absolute;pointer-events:none;user-select:none;z-index:0}
+.clean-watermark.symbol{right:6%;top:10%;width:150px;opacity:.045}
+.clean-watermark.tech{right:-2%;bottom:10%;width:min(560px,54%);opacity:.12;mix-blend-mode:screen;filter:grayscale(.08) saturate(.9)}
+.clean-brand,.clean-copy-block,.clean-footer{position:relative;z-index:1}
+.clean-brand{display:flex;align-items:center;gap:14px}
+.clean-brand .image-mark{width:42px;height:42px;border-radius:12px;background:#fff;border:1px solid rgba(255,255,255,.08);overflow:hidden}
+.clean-copy-block{max-width:540px;margin-top:92px}
+.clean-eyebrow{display:inline-block;font-size:12px;font-weight:900;letter-spacing:.18em;color:var(--yellow);margin-bottom:18px}
+.clean-copy-block h1{font-size:70px;line-height:.94;letter-spacing:-.06em;margin:0 0 18px;max-width:520px;color:#fff}
+.clean-copy-block p{font-size:21px;line-height:1.45;color:#b9bbb3;max-width:490px;margin:0 0 26px}
+.clean-feature-list{display:grid;gap:12px;max-width:470px}
+.clean-feature-list>div{display:flex;align-items:center;gap:11px;padding:14px 16px;border-radius:16px;border:1px solid rgba(255,255,255,.09);background:rgba(255,255,255,.03);color:#eceae1}
+.clean-feature-list svg{color:var(--yellow);flex-shrink:0}
+.clean-footer{position:absolute;left:34px;right:34px;bottom:20px;display:flex;justify-content:space-between;color:#8e8f89;font-size:12px}
+
+.clean-panel{background:linear-gradient(180deg,#161713 0%,#11120f 100%);display:grid;place-items:center;padding:28px}
+.clean-wrap{width:min(470px,100%)}
+.clean-panel-brand{display:flex;justify-content:center;margin-bottom:24px}
+.clean-panel-brand img{width:136px;height:auto;box-shadow:0 12px 32px rgba(0,0,0,.18)}
+.login-card.minimal.gpv-clean{width:min(430px,100%);border-radius:28px;padding:28px;background:linear-gradient(180deg,#141512 0%,#10110e 100%);border:1px solid #282a25;box-shadow:0 34px 80px rgba(0,0,0,.24)}
+.login-card-topline{display:flex;justify-content:space-between;align-items:flex-start;gap:16px;margin-bottom:10px}
+.login-card-topline h2{margin:4px 0 0;font-size:30px;line-height:1.02;color:#fff;letter-spacing:-.05em}
+.login-intro{margin:0 0 14px;color:#b4b6af;line-height:1.55;font-size:14px;max-width:280px}
+.login-tip.clean{display:flex;align-items:center;gap:8px;background:rgba(244,196,0,.08);border:1px solid rgba(244,196,0,.22);color:#f1d161;border-radius:12px;padding:11px 12px;margin-bottom:16px;font-size:12px;font-weight:600}
+.login-card.minimal.gpv-clean .field label{color:#f5f3ee}
+.login-card.minimal.gpv-clean .input-icon>svg{color:#8d8f88}
+.login-card.minimal.gpv-clean .input{background:#f5f4ef;border-color:#dad7cb;color:#111!important}
+.login-card.minimal.gpv-clean .input::placeholder{color:#8d8c85!important;opacity:1}
+.login-card.minimal.gpv-clean .input:focus{border-color:#c89f00;box-shadow:0 0 0 3px rgba(244,196,0,.12)}
+.login-mini-features{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:16px}
+.login-mini-features>div{display:flex;align-items:center;gap:8px;padding:12px;border-radius:14px;background:#171815;border:1px solid #292b26;color:#ece9de;font-size:12px}
+.login-mini-features svg{color:var(--yellow)}
+
+@media(max-width:1180px){
+  .clean-copy-block{margin-top:56px}
+  .clean-copy-block h1{font-size:58px;max-width:450px}
+  .clean-copy-block p{font-size:18px;max-width:430px}
+  .clean-watermark.tech{width:min(480px,58%);opacity:.09}
+}
+@media(max-width:980px){
+  .clean-visual{padding-bottom:32px}
+  .clean-footer{position:static;margin-top:28px}
+  .clean-copy-block{margin-top:44px;max-width:none}
+  .clean-watermark.symbol{right:4%;top:8%}
+  .clean-watermark.tech{right:-8%;bottom:0;width:min(520px,82%);opacity:.08}
+  .clean-panel{padding:24px;background:#11120f}
+}
+@media(max-width:700px){
+  .clean-copy-block h1{font-size:44px}
+  .clean-copy-block p{font-size:16px}
+  .login-card-topline{flex-direction:column}
+  .login-mini-features{grid-template-columns:1fr}
+  .clean-watermark.symbol{width:110px}
+}

@@ -30,19 +30,18 @@ function LoginForm() {
   }
 
   return (
-    <div className="login-card upgraded gpv">
-      <div className="login-card-head gpv">
-        <div className="login-head-copy">
+    <div className="login-card minimal gpv-clean">
+      <div className="login-card-topline">
+        <div>
           <div className="login-kicker">ACESSO INTERNO</div>
           <h2>Entrar no portal</h2>
-          <p>Use seu e-mail cadastrado e o CPF para acessar o ambiente interno.</p>
         </div>
-        <div className="login-plate-right">
-          <Plate value="GPV Associados" wide />
-        </div>
+        <Plate value="GPV Associados" wide />
       </div>
 
-      <div className="login-tip gpv">
+      <p className="login-intro">Use seu e-mail cadastrado e o CPF para acessar o ambiente interno.</p>
+
+      <div className="login-tip clean">
         <ShieldCheck size={16} />
         <span>Acesso restrito à equipe autorizada.</span>
       </div>
@@ -72,15 +71,9 @@ function LoginForm() {
         </button>
       </form>
 
-      <div className="login-meta-grid">
-        <div>
-          <CalendarClock size={16} />
-          <span>Agendamentos centralizados</span>
-        </div>
-        <div>
-          <UsersRound size={16} />
-          <span>Atendimento e operação conectados</span>
-        </div>
+      <div className="login-mini-features">
+        <div><CalendarClock size={16} /> <span>Agenda organizada</span></div>
+        <div><UsersRound size={16} /> <span>Operação integrada</span></div>
       </div>
     </div>
   );
@@ -88,13 +81,13 @@ function LoginForm() {
 
 export default function LoginPage() {
   return (
-    <div className="login-page">
-      <section className="login-visual upgraded gpv-visual">
-        <img src="/assets/gpv-symbol.png" alt="Símbolo GPV" className="bg-logo watermark-one" />
-        <img src="/assets/gpv-truck.png" alt="GPV Truck" className="bg-logo watermark-two" />
-        <img src="/assets/app-symbol.png" alt="Símbolo do aplicativo" className="bg-logo watermark-symbol" />
+    <div className="login-page clean-layout">
+      <section className="login-visual clean-visual">
+        <div className="clean-bg-glow" />
+        <img src="/assets/gpv-symbol.png" alt="Símbolo GPV" className="clean-watermark symbol" />
+        <img src="/assets/tech-car.png" alt="Diagrama técnico do carro" className="clean-watermark tech" />
 
-        <div className="login-brand gpv-brand">
+        <div className="login-brand clean-brand">
           <span className="brand-mark image-mark"><img src="/assets/app-symbol.png" alt="Ícone do aplicativo" /></span>
           <div>
             <strong>Portal Coleta de Relatos</strong>
@@ -102,47 +95,27 @@ export default function LoginPage() {
           </div>
         </div>
 
-        <div className="login-art upgraded gpv-art">
-          <div className="login-copy">
-            <span>GESTÃO INTERNA</span>
-            <h1>Agendamentos, relatos e atendimento com mais clareza operacional.</h1>
-            <p>Uma visão interna para acompanhar contatos, veículos e registros com uma identidade conectada à GPV Associados.</p>
-            <div className="login-bullets gpv-bullets">
-              <div><UsersRound size={16} /><span>Equipe, operação e atendimento integrados</span></div>
-              <div><CalendarClock size={16} /><span>Agenda semanal organizada para a rotina</span></div>
-              <div><ShieldCheck size={16} /><span>Ambiente interno estruturado para controle</span></div>
-            </div>
-          </div>
+        <div className="clean-copy-block">
+          <span className="clean-eyebrow">GESTÃO INTERNA</span>
+          <h1>Agendamentos e relatos em um só portal.</h1>
+          <p>Controle interno para acompanhar veículos, contatos e registros com mais clareza.</p>
 
-          <div className="login-graphic-board">
-            <div className="login-graphic-surface">
-              <div className="board-topline">
-                <span>VISÃO TÉCNICA</span>
-                <span>GPV ASSOCIADOS</span>
-              </div>
-              <div className="tech-lines" />
-              <img src="/assets/tech-car.png" alt="Diagrama técnico do carro" className="tech-car-art" />
-              <div className="graphic-badge badge-one">
-                <img src="/assets/app-symbol.png" alt="Símbolo do aplicativo" />
-                <span>Operação conectada</span>
-              </div>
-              <div className="graphic-badge badge-two">
-                <img src="/assets/gpv-symbol.png" alt="Símbolo GPV" />
-                <span>Identidade GPV</span>
-              </div>
-            </div>
+          <div className="clean-feature-list">
+            <div><UsersRound size={16} /><span>Equipe, operação e atendimento conectados</span></div>
+            <div><CalendarClock size={16} /><span>Visão organizada da agenda interna</span></div>
+            <div><ShieldCheck size={16} /><span>Ambiente interno com acesso controlado</span></div>
           </div>
         </div>
 
-        <div className="login-footer">
+        <div className="login-footer clean-footer">
           <span>Portal Coleta de Relatos</span>
           <span>Uso interno</span>
         </div>
       </section>
 
-      <section className="login-panel upgraded gpv-panel">
-        <div className="login-panel-wrap">
-          <div className="login-panel-brand">
+      <section className="login-panel clean-panel">
+        <div className="login-panel-wrap clean-wrap">
+          <div className="login-panel-brand clean-panel-brand">
             <img src="/assets/gpv-logo-yellow.jpg" alt="GPV Associados" />
           </div>
           <Suspense fallback={<div className="spinner" />}>
