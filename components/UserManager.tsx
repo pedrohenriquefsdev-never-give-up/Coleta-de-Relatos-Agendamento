@@ -1,7 +1,7 @@
 "use client";
 
 import { collection, onSnapshot, orderBy, query } from "firebase/firestore";
-import { BriefcaseBusiness, KeyRound, Pencil, PhoneCall, Plus, UserCheck, UserX } from "lucide-react";
+import { BriefcaseBusiness, KeyRound, Pencil, PhoneCall, Plus, ServerCog, UserCheck, UserX } from "lucide-react";
 import { useEffect, useState } from "react";
 import { auth, db } from "@/lib/firebase";
 import type { AppUser, UserRole } from "@/lib/types";
@@ -27,6 +27,9 @@ export default function UserManager() {
   const [loading, setLoading] = useState(false);
   const [loadingVT, setLoadingVT] = useState(false);
   const [error, setError] = useState("");
+  const [diagOpen, setDiagOpen] = useState(false);
+  const [diagLoading, setDiagLoading] = useState(false);
+  const [diag, setDiag] = useState<any>(null);
   const [otherDepartment, setOtherDepartment] = useState("");
   const [form, setForm] = useState({ name: "", email: "", cpf: "", role: "atendente" as UserRole, department: "Atendimento" });
   const [vtcall, setVtcall] = useState(DEFAULT_VTCALL);
@@ -121,6 +124,28 @@ export default function UserManager() {
     finally { setLoading(false); }
   }
 
+
+  async function runDiagnostic() {
+    setDiagOpen(true);
+    setDiagLoading(true);
+    setDiag(null);
+    try {
+      const res = await fetch("/api/diagnostics/firebase-admin", {
+        headers: { Authorization: `Bearer ${await token()}` },
+        cache: "no-store",
+      });
+      const text = await res.text();
+      let data: any = {};
+      try { data = text ? JSON.parse(text) : {}; }
+      catch { data = { error: `Resposta inválida do servidor (HTTP ${res.status}).`, raw: text.slice(0, 300) }; }
+      setDiag({ httpStatus: res.status, ...data });
+    } catch (e) {
+      setDiag({ error: e instanceof Error ? e.message : "Falha ao executar diagnóstico." });
+    } finally {
+      setDiagLoading(false);
+    }
+  }
+
   const VtFields = () => (
     <div className="vt-admin-box">
       <div className="vt-admin-head"><PhoneCall size={16}/><div><strong>Configuração VTCall</strong><small>Dados individuais para conexão do ramal.</small></div></div>
@@ -138,7 +163,7 @@ export default function UserManager() {
 
   return <>
     <div className="panel">
-      <div className="panel-head"><div><h2>Usuários com acesso</h2><small>Perfis, identificação, ramal e status de acesso ao portal.</small></div><button className="btn primary" onClick={()=>setOpen(true)}><Plus size={16}/> Novo usuário</button></div>
+      <div className="panel-head"><div><h2>Usuários com acesso</h2><small>Perfis, identificação, ramal e status de acesso ao portal.</small></div><div className="row-actions"><button className="btn" onClick={runDiagnostic}><ServerCog size={16}/> Diagnóstico backend</button><button className="btn primary" onClick={()=>setOpen(true)}><Plus size={16}/> Novo usuário</button></div></div>
       <div className="table-wrap"><table className="table"><thead><tr><th>Usuário</th><th>E-mail</th><th>Departamento</th><th>Ramal</th><th>Perfil</th><th>Status</th><th></th></tr></thead><tbody>
         {users.map((u)=><tr key={u.uid}>
           <td><div className="user-table-cell">{u.photoUrl?<img className="avatar" src={u.photoUrl} alt=""/>:<div className="avatar">{u.name?.[0]}</div>}<strong>{u.name}</strong></div></td>
@@ -150,6 +175,24 @@ export default function UserManager() {
         </tr>)}
       </tbody></table></div>
     </div>
+
+    {diagOpen&&<Modal title="Diagnóstico do backend" onClose={()=>setDiagOpen(false)} footer={<button className="btn primary" onClick={()=>setDiagOpen(false)}>Fechar</button>}>
+      <div className="stack">
+        {diagLoading&&<div className="info-note"><ServerCog size={16}/><span>Testando Firebase Admin no servidor...</span></div>}
+        {!diagLoading&&diag&&<div className="diagnostic-grid">
+          <div className={`diag-row ${diag.ok?"ok":"bad"}`}><span>Configuração Firebase Admin</span><strong>{diag.ok?"OK":"FALHA"}</strong></div>
+          <div className={`diag-row ${diag.projectId?"ok":"bad"}`}><span>Project ID</span><strong>{diag.projectId||"Não lido"}</strong></div>
+          <div className={`diag-row ${diag.clientEmailPresent?"ok":"bad"}`}><span>Client e-mail</span><strong>{diag.clientEmailPresent?"Presente":"Ausente"}</strong></div>
+          <div className={`diag-row ${diag.privateKeyPresent?"ok":"bad"}`}><span>Private key</span><strong>{diag.privateKeyPresent?"Presente":"Ausente"}</strong></div>
+          <div className={`diag-row ${diag.privateKeyLooksValid?"ok":"bad"}`}><span>Formato da private key</span><strong>{diag.privateKeyLooksValid?"Reconhecido":"Inválido"}</strong></div>
+          <div className={`diag-row ${diag.tokenVerified?"ok":"bad"}`}><span>Validação do token</span><strong>{diag.tokenVerified?"OK":"FALHA"}</strong></div>
+          <div className={`diag-row ${diag.userDocumentExists?"ok":"bad"}`}><span>Documento do usuário</span><strong>{diag.userDocumentExists?"Encontrado":"Não encontrado"}</strong></div>
+          <div className="diag-row"><span>HTTP</span><strong>{diag.httpStatus??"—"}</strong></div>
+          {diag.code&&<div className="diag-code">Código: {String(diag.code)}</div>}
+          {diag.error&&<div className="error">{String(diag.error)}</div>}
+        </div>}
+      </div>
+    </Modal>}
 
     {open&&<Modal title="Criar usuário" onClose={()=>setOpen(false)} footer={<><button className="btn" onClick={()=>setOpen(false)}>Cancelar</button><button className="btn primary" onClick={create} disabled={loading}>{loading?"Criando...":"Criar usuário"}</button></>}>
       <div className="stack">{error&&<div className="error">{error}</div>}

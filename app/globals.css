@@ -1749,3 +1749,13 @@
   .vt-page-download{width:100%;justify-content:center}
   .vt-page-steps{grid-template-columns:1fr}
 }
+
+
+/* V1.27 temporary backend diagnostics */
+.diagnostic-grid{display:grid;gap:8px}
+.diag-row{display:flex;align-items:center;justify-content:space-between;gap:16px;padding:11px 12px;border-radius:12px;background:rgba(255,255,255,.025);border:1px solid var(--line);font-size:12px}
+.diag-row span{color:var(--muted)}
+.diag-row strong{font-size:12px;text-align:right;word-break:break-word}
+.diag-row.ok strong{color:#45c486}
+.diag-row.bad strong{color:#ff5b5b}
+.diag-code{font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-size:11px;color:var(--muted);padding:10px 12px;border-radius:10px;background:#121310;border:1px solid var(--line)}
