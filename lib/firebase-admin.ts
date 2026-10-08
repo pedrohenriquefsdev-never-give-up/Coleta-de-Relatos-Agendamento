@@ -85,16 +85,54 @@ export const adminAuth = () => getAuth(adminApp());
 export const adminDb = () => getFirestore(adminApp());
 
 export function firebaseAdminDiagnostic() {
+  const rawProjectId =
+    process.env.FIREBASE_ADMIN_PROJECT_ID ||
+    process.env.FIREBASE_PROJECT_ID ||
+    process.env.GCLOUD_PROJECT ||
+    "";
+
+  const rawClientEmail =
+    process.env.FIREBASE_ADMIN_CLIENT_EMAIL ||
+    process.env.FIREBASE_CLIENT_EMAIL ||
+    "";
+
+  const rawPrivateKey =
+    process.env.FIREBASE_ADMIN_PRIVATE_KEY ||
+    process.env.FIREBASE_PRIVATE_KEY ||
+    "";
+
+  const rawServiceAccount =
+    process.env.FIREBASE_SERVICE_ACCOUNT_KEY ||
+    process.env.FIREBASE_SERVICE_ACCOUNT_JSON ||
+    "";
+
+  const result: any = {
+    projectIdPresent: Boolean(rawProjectId),
+    projectId: rawProjectId ? clean(rawProjectId) : null,
+    clientEmailPresent: Boolean(rawClientEmail),
+    clientEmailLength: rawClientEmail?.length || 0,
+    privateKeyPresent: Boolean(rawPrivateKey),
+    privateKeyLength: rawPrivateKey?.length || 0,
+    privateKeyHasBegin: String(rawPrivateKey).includes("BEGIN PRIVATE KEY"),
+    privateKeyHasEnd: String(rawPrivateKey).includes("END PRIVATE KEY"),
+    serviceAccountPresent: Boolean(rawServiceAccount),
+    serviceAccountLength: rawServiceAccount?.length || 0,
+    source: rawServiceAccount ? "FIREBASE_SERVICE_ACCOUNT_*" : "FIREBASE_ADMIN_*",
+  };
+
   try {
     const c = credentials();
     return {
+      ...result,
       ok: true,
-      projectId: c.projectId,
-      clientEmailPresent: Boolean(c.clientEmail),
-      privateKeyPresent: Boolean(c.privateKey),
-      privateKeyLooksValid: c.privateKey.includes("BEGIN PRIVATE KEY"),
+      normalizedProjectId: c.projectId,
+      normalizedPrivateKeyLooksValid: c.privateKey.includes("BEGIN PRIVATE KEY") && c.privateKey.includes("END PRIVATE KEY"),
     };
   } catch (e) {
-    return { ok: false, error: e instanceof Error ? e.message : "Erro desconhecido." };
+    return {
+      ...result,
+      ok: false,
+      error: e instanceof Error ? e.message : "Erro desconhecido.",
+    };
   }
 }

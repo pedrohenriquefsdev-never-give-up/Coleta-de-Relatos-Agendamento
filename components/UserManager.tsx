@@ -181,12 +181,16 @@ export default function UserManager() {
         {diagLoading&&<div className="info-note"><ServerCog size={16}/><span>Testando Firebase Admin no servidor...</span></div>}
         {!diagLoading&&diag&&<div className="diagnostic-grid">
           <div className={`diag-row ${diag.ok?"ok":"bad"}`}><span>Configuração Firebase Admin</span><strong>{diag.ok?"OK":"FALHA"}</strong></div>
-          <div className={`diag-row ${diag.projectId?"ok":"bad"}`}><span>Project ID</span><strong>{diag.projectId||"Não lido"}</strong></div>
-          <div className={`diag-row ${diag.clientEmailPresent?"ok":"bad"}`}><span>Client e-mail</span><strong>{diag.clientEmailPresent?"Presente":"Ausente"}</strong></div>
-          <div className={`diag-row ${diag.privateKeyPresent?"ok":"bad"}`}><span>Private key</span><strong>{diag.privateKeyPresent?"Presente":"Ausente"}</strong></div>
-          <div className={`diag-row ${diag.privateKeyLooksValid?"ok":"bad"}`}><span>Formato da private key</span><strong>{diag.privateKeyLooksValid?"Reconhecido":"Inválido"}</strong></div>
+          <div className={`diag-row ${diag.projectIdPresent?"ok":"bad"}`}><span>Project ID no ambiente</span><strong>{diag.projectIdPresent?diag.projectId:"Ausente"}</strong></div>
+          <div className={`diag-row ${diag.clientEmailPresent?"ok":"bad"}`}><span>Client e-mail no ambiente</span><strong>{diag.clientEmailPresent?`Presente (${diag.clientEmailLength} chars)`:"Ausente"}</strong></div>
+          <div className={`diag-row ${diag.privateKeyPresent?"ok":"bad"}`}><span>Private key no ambiente</span><strong>{diag.privateKeyPresent?`Presente (${diag.privateKeyLength} chars)`:"Ausente"}</strong></div>
+          <div className={`diag-row ${diag.privateKeyHasBegin&&diag.privateKeyHasEnd?"ok":"bad"}`}><span>Marcadores BEGIN/END</span><strong>{diag.privateKeyHasBegin&&diag.privateKeyHasEnd?"Encontrados":"Não encontrados"}</strong></div>
+          <div className={`diag-row ${diag.serviceAccountPresent?"ok":""}`}><span>JSON completo alternativo</span><strong>{diag.serviceAccountPresent?`Presente (${diag.serviceAccountLength} chars)`:"Não usado"}</strong></div>
+          <div className={`diag-row ${diag.normalizedPrivateKeyLooksValid?"ok":"bad"}`}><span>Private key após normalização</span><strong>{diag.normalizedPrivateKeyLooksValid?"Reconhecida":"Inválida"}</strong></div>
+          <div className={`diag-row ${diag.sdkInitialized?"ok":"bad"}`}><span>Firebase Admin SDK</span><strong>{diag.sdkInitialized?"Inicializado":"FALHA"}</strong></div>
           <div className={`diag-row ${diag.tokenVerified?"ok":"bad"}`}><span>Validação do token</span><strong>{diag.tokenVerified?"OK":"FALHA"}</strong></div>
           <div className={`diag-row ${diag.userDocumentExists?"ok":"bad"}`}><span>Documento do usuário</span><strong>{diag.userDocumentExists?"Encontrado":"Não encontrado"}</strong></div>
+          <div className="diag-row"><span>Fonte</span><strong>{diag.source||"—"}</strong></div>
           <div className="diag-row"><span>HTTP</span><strong>{diag.httpStatus??"—"}</strong></div>
           {diag.code&&<div className="diag-code">Código: {String(diag.code)}</div>}
           {diag.error&&<div className="error">{String(diag.error)}</div>}
