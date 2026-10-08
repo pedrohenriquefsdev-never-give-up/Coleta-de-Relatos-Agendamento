@@ -81,13 +81,15 @@ function LoginForm() {
 
 export default function LoginPage() {
   return (
-    <div className="login-page clean-layout">
-      <section className="login-visual clean-visual">
-        <div className="clean-bg-glow" />
-        <img src="/assets/gpv-symbol.png" alt="Símbolo GPV" className="clean-watermark symbol" />
-        <img src="/assets/tech-car.png" alt="Diagrama técnico do carro" className="clean-watermark tech" />
+    <div className="login-page clean-layout v15-layout">
+      <section className="login-visual v15-visual">
+        <div className="v15-grid" />
+        <div className="v15-glow glow-a" />
+        <div className="v15-glow glow-b" />
+        <div className="v15-orbit orbit-a" />
+        <div className="v15-orbit orbit-b" />
 
-        <div className="login-brand clean-brand">
+        <div className="login-brand clean-brand v15-brand">
           <span className="brand-mark image-mark"><img src="/assets/app-symbol.png" alt="Ícone do aplicativo" /></span>
           <div>
             <strong>Portal Coleta de Relatos</strong>
@@ -95,29 +97,26 @@ export default function LoginPage() {
           </div>
         </div>
 
-        <div className="clean-copy-block">
+        <div className="v15-copy-block">
           <span className="clean-eyebrow">GESTÃO INTERNA</span>
-          <h1>Agendamentos e relatos em um só portal.</h1>
-          <p>Controle interno para acompanhar veículos, contatos e registros com mais clareza.</p>
-
-          <div className="clean-feature-list">
-            <div><UsersRound size={16} /><span>Equipe, operação e atendimento conectados</span></div>
-            <div><CalendarClock size={16} /><span>Visão organizada da agenda interna</span></div>
-            <div><ShieldCheck size={16} /><span>Ambiente interno com acesso controlado</span></div>
-          </div>
+          <h1>Controle interno com mais clareza.</h1>
+          <p>Agendamentos, contatos e registros reunidos em um só portal.</p>
         </div>
 
-        <div className="login-footer clean-footer">
+        <div className="v15-feature-stack">
+          <div><UsersRound size={16} /><span>Equipe, operação e atendimento conectados</span></div>
+          <div><CalendarClock size={16} /><span>Visão organizada da agenda interna</span></div>
+          <div><ShieldCheck size={16} /><span>Ambiente interno com acesso controlado</span></div>
+        </div>
+
+        <div className="login-footer clean-footer v15-footer">
           <span>Portal Coleta de Relatos</span>
           <span>Uso interno</span>
         </div>
       </section>
 
-      <section className="login-panel clean-panel">
+      <section className="login-panel clean-panel v15-panel">
         <div className="login-panel-wrap clean-wrap">
-          <div className="login-panel-brand clean-panel-brand">
-            <img src="/assets/gpv-logo-yellow.jpg" alt="GPV Associados" />
-          </div>
           <Suspense fallback={<div className="spinner" />}>
             <LoginForm />
           </Suspense>

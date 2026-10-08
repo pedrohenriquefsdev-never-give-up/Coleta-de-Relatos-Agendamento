@@ -218,3 +218,43 @@
   .login-mini-features{grid-template-columns:1fr}
   .clean-watermark.symbol{width:110px}
 }
+
+/* V1.5 simplified login redesign */
+.v15-layout{background:#0c0d0b}
+.v15-visual{position:relative;isolation:isolate;padding:32px 34px 24px;background:linear-gradient(140deg,#090a08 0%,#10110e 48%,#13140f 100%);overflow:hidden}
+.v15-grid{position:absolute;inset:0;background-image:linear-gradient(rgba(255,255,255,.025) 1px, transparent 1px),linear-gradient(90deg, rgba(255,255,255,.025) 1px, transparent 1px);background-size:56px 56px;mask-image:radial-gradient(circle at 36% 44%, black 35%, transparent 85%);opacity:.35;z-index:0}
+.v15-glow{position:absolute;border-radius:999px;pointer-events:none;z-index:0;filter:blur(18px)}
+.v15-glow.glow-a{width:330px;height:330px;left:12%;top:20%;background:radial-gradient(circle, rgba(244,196,0,.16) 0%, rgba(244,196,0,.08) 35%, transparent 72%)}
+.v15-glow.glow-b{width:280px;height:280px;right:6%;bottom:18%;background:radial-gradient(circle, rgba(244,196,0,.10) 0%, rgba(244,196,0,.05) 35%, transparent 72%)}
+.v15-orbit{position:absolute;border:1px solid rgba(244,196,0,.12);border-radius:999px;z-index:0}
+.v15-orbit.orbit-a{width:420px;height:420px;left:-120px;bottom:-120px}
+.v15-orbit.orbit-b{width:260px;height:260px;right:40px;top:84px}
+.v15-brand,.v15-copy-block,.v15-feature-stack,.v15-footer{position:relative;z-index:1}
+.v15-copy-block{max-width:520px;margin-top:94px}
+.v15-copy-block h1{font-size:74px;line-height:.92;letter-spacing:-.065em;margin:0 0 18px;color:#fff;max-width:520px}
+.v15-copy-block p{font-size:22px;line-height:1.45;color:#b5b7af;margin:0;max-width:470px}
+.v15-feature-stack{position:absolute;left:34px;right:64px;bottom:66px;display:grid;gap:10px;max-width:520px}
+.v15-feature-stack>div{display:flex;align-items:center;gap:11px;padding:15px 16px;border-radius:16px;background:linear-gradient(90deg,rgba(255,255,255,.045),rgba(255,255,255,.025));border:1px solid rgba(255,255,255,.08);backdrop-filter:blur(6px);color:#f0eee7;box-shadow:0 10px 28px rgba(0,0,0,.12)}
+.v15-feature-stack svg{color:var(--yellow);flex-shrink:0}
+.v15-footer{left:34px;right:34px;bottom:20px}
+.v15-panel{background:linear-gradient(180deg,#141512 0%,#10110e 100%);display:grid;place-items:center;padding:28px}
+.v15-panel .login-panel-wrap{width:min(430px,100%)}
+.v15-panel .login-card.minimal.gpv-clean{background:linear-gradient(180deg,#131411 0%,#10110e 100%)}
+.v15-panel .login-intro{max-width:310px}
+
+@media(max-width:1180px){
+  .v15-copy-block{margin-top:64px}
+  .v15-copy-block h1{font-size:60px;max-width:440px}
+  .v15-copy-block p{font-size:18px;max-width:400px}
+  .v15-feature-stack{right:34px;max-width:460px}
+}
+@media(max-width:980px){
+  .v15-feature-stack{position:static;max-width:none;margin-top:34px}
+  .v15-copy-block{margin-top:44px}
+  .v15-footer{position:static;margin-top:28px}
+  .v15-orbit.orbit-b{right:-40px;top:auto;bottom:120px}
+}
+@media(max-width:700px){
+  .v15-copy-block h1{font-size:46px}
+  .v15-copy-block p{font-size:16px}
+}
