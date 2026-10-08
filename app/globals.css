@@ -697,3 +697,118 @@
   .v18-feature-stack{bottom:44px!important}
   .v17-footer{bottom:14px!important}
 }
+
+/* V1.10 anti-overlap spacing correction */
+.v18-hero-grid{
+  margin-top:44px!important;
+  grid-template-columns:minmax(300px,.82fr) minmax(340px,1.18fr)!important;
+  gap:56px!important;
+  align-items:start!important;
+}
+.v18-copy-block{
+  padding-top:16px!important;
+}
+.v18-copy-block h1{
+  font-size:clamp(46px,4.2vw,60px)!important;
+  max-width:360px!important;
+  line-height:.94!important;
+}
+.v18-microcards{
+  min-height:300px!important;
+  margin-top:6px!important;
+}
+.v18-microcard{
+  width:min(238px,72%)!important;
+  padding:14px 15px!important;
+}
+.v18-microcard.card-a{
+  top:0!important;
+  left:34px!important;
+}
+.v18-microcard.card-b{
+  top:92px!important;
+  left:154px!important;
+}
+.v18-microcard.card-c{
+  top:194px!important;
+  left:58px!important;
+}
+.v18-microcard strong{font-size:13.5px!important}
+.v18-microcard small{font-size:11px!important;line-height:1.38!important}
+.v18-microcard .micro-icon{
+  width:40px!important;
+  height:40px!important;
+}
+.cluster-a{top:62px!important;left:324px!important}
+.cluster-b{top:174px!important;left:98px!important}
+.cluster-c{top:246px!important;left:374px!important}
+.v18-feature-stack{
+  bottom:64px!important;
+  width:min(520px,calc(100% - 60px))!important;
+  gap:10px!important;
+}
+.v18-feature-stack>div{
+  padding:12px 15px!important;
+}
+.v18-feature-stack>div span{
+  font-size:12.5px!important;
+}
+.v17-footer{
+  bottom:12px!important;
+}
+.v18-panel .login-panel-wrap{
+  width:min(408px,100%)!important;
+}
+.v18-login-card{
+  padding:22px 20px 18px!important;
+}
+.v18-login-card .login-card-topline h2{
+  font-size:34px!important;
+  max-width:168px!important;
+}
+.v18-login-card .login-intro{
+  max-width:280px!important;
+}
+.v18-login-card .vehicle-plate.wide{
+  width:150px!important;
+}
+.v18-login-mini-features>div{
+  font-size:10.5px!important;
+}
+
+@media(max-height:800px) and (min-width:981px){
+  .v18-hero-grid{
+    margin-top:30px!important;
+    gap:48px!important;
+  }
+  .v18-copy-block h1{
+    font-size:clamp(42px,3.9vw,54px)!important;
+    max-width:330px!important;
+  }
+  .v18-microcards{
+    min-height:276px!important;
+  }
+  .v18-microcard{
+    width:min(224px,70%)!important;
+    padding:13px 14px!important;
+  }
+  .v18-microcard.card-a{left:26px!important}
+  .v18-microcard.card-b{top:86px!important;left:134px!important}
+  .v18-microcard.card-c{top:176px!important;left:44px!important}
+  .cluster-a{left:300px!important}
+  .cluster-b{left:84px!important}
+  .cluster-c{left:350px!important;top:226px!important}
+  .v18-feature-stack{
+    bottom:52px!important;
+    width:min(500px,calc(100% - 60px))!important;
+  }
+  .v18-feature-stack>div{
+    padding:11px 14px!important;
+  }
+  .v18-feature-stack>div span{
+    font-size:12px!important;
+  }
+  .v17-footer{
+    bottom:10px!important;
+  }
+}
