@@ -10,7 +10,16 @@ export async function GET(req: NextRequest) {
     return Response.json({ error: "Não autorizado." }, { status: 401 });
   }
 
-  const diagnostic: any = firebaseAdminDiagnostic();
+  const diagnostic: any = {
+    ...firebaseAdminDiagnostic(),
+    serverEnvTestPresent: Boolean(process.env.SERVER_ENV_TEST),
+    serverEnvTestValue: process.env.SERVER_ENV_TEST || null,
+    cloudinaryCloudNamePresent: Boolean(process.env.CLOUDINARY_CLOUD_NAME),
+    cloudinaryApiKeyPresent: Boolean(process.env.CLOUDINARY_API_KEY),
+    cloudinaryApiSecretPresent: Boolean(process.env.CLOUDINARY_API_SECRET),
+    vtcallEncryptionKeyPresent: Boolean(process.env.VTCALL_CREDENTIALS_ENCRYPTION_KEY),
+    vtcallAccessTokenPresent: Boolean(process.env.VTCALL_ACCESS_TOKEN),
+  };
 
   if (!diagnostic.ok) {
     return Response.json({
