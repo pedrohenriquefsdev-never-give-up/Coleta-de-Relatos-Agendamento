@@ -1,7 +1,7 @@
 "use client";
 
 import { addDoc, collection, deleteDoc, doc, serverTimestamp, updateDoc } from "firebase/firestore";
-import { Trash2 } from "lucide-react";
+import { ExternalLink, PhoneCall, Trash2 } from "lucide-react";
 import { useMemo, useState } from "react";
 import { db } from "@/lib/firebase";
 import { useSession } from "./AuthGate";
@@ -50,6 +50,30 @@ export default function AppointmentModal({
 
   const title = useMemo(() => (initial ? `Agendamento • ${initial.plate}` : "Novo agendamento"), [initial]);
   const canDelete = !!initial && profile?.role === "admin";
+  const vtcallDialUrl = process.env.NEXT_PUBLIC_VTCALL_DIAL_URL || "";
+
+  function openVTCall() {
+    const phone = cleanPhone(form.phone);
+    if (!phone) return setError("Informe um telefone válido antes de iniciar a ligação.");
+    if (!vtcallDialUrl) {
+      return setError("VTCall ainda não está configurado. Aguardando a documentação/API para concluir a integração.");
+    }
+
+    let target = vtcallDialUrl;
+    if (target.includes("{phone}")) {
+      target = target.replaceAll("{phone}", encodeURIComponent(phone));
+    } else {
+      try {
+        const url = new URL(target);
+        url.searchParams.set("phone", phone);
+        target = url.toString();
+      } catch {
+        target = `${target}${target.includes("?") ? "&" : "?"}phone=${encodeURIComponent(phone)}`;
+      }
+    }
+
+    window.open(target, "_blank", "noopener,noreferrer");
+  }
 
   async function save() {
     setError("");
@@ -58,10 +82,12 @@ export default function AppointmentModal({
     }
     setSaving(true);
     try {
+      const cleanedPhone = cleanPhone(form.phone);
       const payload = {
         ...form,
         plate: cleanPlate(form.plate),
-        phone: cleanPhone(form.phone),
+        phone: cleanedPhone,
+        phoneDigits: cleanedPhone,
         updatedAt: serverTimestamp(),
       };
 
@@ -165,7 +191,16 @@ export default function AppointmentModal({
         <div className="grid-2">
           <div className="field">
             <label>Telefone atualizado *</label>
-            <input className="input" value={form.phone} onChange={(e) => setForm({ ...form, phone: cleanPhone(e.target.value) })} placeholder="81999999999" />
+            <div className="phone-field-wrap">
+              <input className="input" value={form.phone} onChange={(e) => setForm({ ...form, phone: cleanPhone(e.target.value) })} placeholder="81999999999" />
+              {initial && (
+                <button type="button" className="phone-vtcall-btn" onClick={openVTCall} title="Abrir no VTCall">
+                  <PhoneCall size={15} />
+                  <span>{form.phone || "Ligar via VTCall"}</span>
+                  <ExternalLink size={13} />
+                </button>
+              )}
+            </div>
           </div>
           <div className="field">
             <label>E-mail *</label>

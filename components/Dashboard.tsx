@@ -333,12 +333,21 @@ export default function Dashboard() {
           <button className={tab === "perfil" ? "active" : ""} onClick={() => setTab("perfil")}><UserRound size={18} /> Meu perfil</button>
         </div>
 
+        <div className="sidebar-profile-card" onClick={() => setTab("perfil")}>
+          {currentProfile.photoUrl ? (
+            <img className="sidebar-profile-photo" src={currentProfile.photoUrl} alt={`Foto de ${currentProfile.name}`} />
+          ) : (
+            <div className="sidebar-profile-photo sidebar-profile-placeholder">{currentProfile.name?.[0]}</div>
+          )}
+          <strong>{currentProfile.name}</strong>
+          <span>{currentProfile.department || "Departamento não informado"}</span>
+        </div>
+
         <div className="sidebar-bottom">
-          <div className="user-mini">
-            {currentProfile.photoUrl ? <img className="avatar" src={currentProfile.photoUrl} alt="" /> : <div className="avatar">{currentProfile.name?.[0]}</div>}
-            <div className="user-mini-copy">
-              <strong>{currentProfile.name}</strong>
-              <small>{currentProfile.role}</small>
+          <div className="sidebar-session">
+            <div>
+              <small>Sessão ativa</small>
+              <strong>{currentProfile.role}</strong>
             </div>
             <button className="icon-btn sidebar-logout" onClick={logout} title="Sair">
               <LogOut size={16} />

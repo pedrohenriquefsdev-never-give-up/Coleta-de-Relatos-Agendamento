@@ -8,6 +8,7 @@ export interface AppUser {
   role: UserRole;
   active: boolean;
   photoUrl?: string;
+  department?: string;
   cpfLast4?: string;
   createdAt?: unknown;
   lastAccessAt?: unknown;
@@ -18,6 +19,7 @@ export interface Appointment {
   plate: string;
   fullName: string;
   phone: string;
+  phoneDigits?: string;
   email: string;
   date: string;
   time: string;
@@ -31,7 +33,10 @@ export interface Appointment {
   call?: {
     provider?: "vtcall";
     callId?: string;
+    status?: string;
     duration?: number;
     recordingUrl?: string;
+    startedAt?: unknown;
+    endedAt?: unknown;
   };
 }
