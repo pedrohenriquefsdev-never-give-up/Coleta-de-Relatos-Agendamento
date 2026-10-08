@@ -371,3 +371,230 @@
   .v17-login-card .login-card-topline h2{font-size:42px;max-width:none}
   .v17-login-card{padding:24px 20px 20px}
 }
+
+
+/* V1.8 responsive fidelity correction */
+.v18-hero-grid{
+  position:relative;
+  z-index:1;
+  display:grid;
+  grid-template-columns:minmax(330px,.92fr) minmax(300px,1.08fr);
+  gap:34px;
+  align-items:center;
+  margin-top:82px;
+  padding-right:8px;
+}
+.v18-copy-block{
+  margin-top:0!important;
+  max-width:none;
+}
+.v18-copy-block h1{
+  font-size:clamp(58px,5.15vw,78px)!important;
+  line-height:.91!important;
+  max-width:500px!important;
+  margin:0!important;
+}
+.v18-microcards{
+  position:relative!important;
+  top:auto!important;
+  right:auto!important;
+  width:100%!important;
+  min-height:330px!important;
+  transform:none!important;
+  margin:0!important;
+}
+.v18-microcard{
+  width:min(285px,82%)!important;
+  padding:18px 18px!important;
+}
+.v18-microcard.card-a{
+  top:0!important;
+  left:0!important;
+}
+.v18-microcard.card-b{
+  top:105px!important;
+  left:120px!important;
+}
+.v18-microcard.card-c{
+  top:220px!important;
+  left:28px!important;
+}
+.v18-microcard strong{font-size:15px!important}
+.v18-microcard small{font-size:12px!important}
+.v18-microcard .micro-icon{
+  width:46px!important;
+  height:46px!important;
+  border-radius:14px!important;
+}
+.v18-feature-stack{
+  left:30px!important;
+  bottom:64px!important;
+  width:min(585px,calc(100% - 60px))!important;
+  max-width:none!important;
+}
+.v18-feature-stack>div{
+  padding:15px 18px!important;
+}
+.v18-feature-stack>div span{
+  font-size:14px!important;
+}
+.v18-panel{
+  padding:20px 22px!important;
+}
+.v18-panel .login-panel-wrap{
+  width:min(430px,100%)!important;
+}
+.v18-login-card{
+  width:100%!important;
+  padding:26px 24px 22px!important;
+  border-radius:28px!important;
+}
+.v18-login-card .login-card-topline h2{
+  font-size:40px!important;
+  line-height:.98!important;
+  max-width:190px!important;
+}
+.v18-login-card .login-intro{
+  font-size:13px!important;
+  max-width:300px!important;
+}
+.v18-login-card .login-tip.clean{
+  padding:11px 13px!important;
+  font-size:12px!important;
+}
+.v18-login-card .field label{
+  font-size:12px!important;
+}
+.v18-login-card .input{
+  min-height:50px!important;
+  font-size:14px!important;
+}
+.v18-login-card .btn.primary{
+  min-height:54px!important;
+  font-size:16px!important;
+}
+.v18-login-card .vehicle-plate.wide{
+  width:162px!important;
+}
+.v18-login-card .vehicle-plate.wide.long .plate-value{
+  font-size:12px!important;
+  padding:8px 5px 9px!important;
+}
+.v18-login-card .plate-top{
+  font-size:5px!important;
+  height:16px!important;
+}
+.v18-login-mini-features>div{
+  padding:11px 12px!important;
+  font-size:11px!important;
+}
+.v18-footer{
+  font-size:11px!important;
+}
+@media(max-width:1500px){
+  .v18-hero-grid{
+    grid-template-columns:minmax(300px,.9fr) minmax(290px,1.1fr);
+    gap:24px;
+    margin-top:68px;
+  }
+  .v18-copy-block h1{
+    font-size:clamp(54px,4.8vw,70px)!important;
+  }
+  .v18-microcards{
+    min-height:310px!important;
+  }
+  .v18-microcard{
+    width:min(260px,80%)!important;
+    padding:16px!important;
+  }
+  .v18-microcard.card-b{left:100px!important}
+  .v18-microcard.card-c{top:210px!important}
+  .v18-feature-stack{
+    bottom:54px!important;
+    width:min(560px,calc(100% - 60px))!important;
+  }
+}
+@media(max-height:780px) and (min-width:981px){
+  .v18-hero-grid{
+    margin-top:46px;
+    gap:20px;
+  }
+  .v18-copy-block h1{
+    font-size:clamp(50px,4.4vw,62px)!important;
+  }
+  .v18-microcards{
+    min-height:275px!important;
+  }
+  .v18-microcard{
+    width:min(245px,78%)!important;
+    padding:14px!important;
+  }
+  .v18-microcard.card-b{
+    top:92px!important;
+    left:86px!important;
+  }
+  .v18-microcard.card-c{
+    top:184px!important;
+    left:20px!important;
+  }
+  .v18-microcard strong{font-size:14px!important}
+  .v18-microcard small{font-size:11px!important}
+  .v18-microcard .micro-icon{
+    width:42px!important;
+    height:42px!important;
+  }
+  .v18-feature-stack{
+    bottom:46px!important;
+    gap:9px!important;
+  }
+  .v18-feature-stack>div{
+    padding:12px 16px!important;
+  }
+  .v18-feature-stack>div span{
+    font-size:13px!important;
+  }
+  .v18-login-card{
+    padding:22px 22px 18px!important;
+  }
+  .v18-login-card .login-card-topline h2{
+    font-size:36px!important;
+  }
+  .v18-login-card .login-intro{
+    margin-bottom:14px!important;
+  }
+  .v18-login-card .login-tip.clean{
+    margin-bottom:14px!important;
+  }
+  .v18-login-card .input{
+    min-height:46px!important;
+  }
+  .v18-login-card .btn.primary{
+    min-height:50px!important;
+  }
+  .v18-login-mini-features{
+    margin-top:12px!important;
+  }
+}
+@media(max-width:1180px){
+  .v18-hero-grid{
+    display:block;
+    margin-top:54px;
+  }
+  .v18-microcards{
+    display:grid!important;
+    min-height:0!important;
+    margin-top:28px!important;
+  }
+  .v18-microcard{
+    width:100%!important;
+    position:relative!important;
+    left:auto!important;
+    top:auto!important;
+    transform:none!important;
+  }
+  .v18-feature-stack{
+    position:static!important;
+    width:100%!important;
+    margin-top:26px!important;
+  }
+}

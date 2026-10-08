@@ -30,7 +30,7 @@ function LoginForm() {
   }
 
   return (
-    <div className="login-card minimal gpv-clean v17-login-card">
+    <div className="login-card minimal gpv-clean v17-login-card v18-login-card">
       <div className="login-card-topline">
         <div>
           <div className="login-kicker">ACESSO INTERNO</div>
@@ -97,42 +97,44 @@ export default function LoginPage() {
           </div>
         </div>
 
-        <div className="v15-copy-block v17-copy-block">
-          <span className="clean-eyebrow">GESTÃO INTERNA</span>
-          <h1>Controle interno<br/>com mais<br/>clareza<span className="headline-dot">.</span></h1>
+        <div className="v18-hero-grid">
+          <div className="v15-copy-block v17-copy-block v18-copy-block">
+            <span className="clean-eyebrow">GESTÃO INTERNA</span>
+            <h1>Controle interno<br/>com mais<br/>clareza<span className="headline-dot">.</span></h1>
+          </div>
+
+          <div className="v16-microcards v17-microcards v18-microcards" aria-hidden="true">
+            <div className="v16-microcard v17-microcard v18-microcard card-a">
+              <span className="micro-icon"><CalendarClock size={18} /></span>
+              <div className="micro-content">
+                <strong>Agendamentos</strong>
+                <small>Organize e acompanhe<br/>as demandas.</small>
+              </div>
+              <span className="micro-arrow"><ChevronRight size={18} /></span>
+            </div>
+            <div className="v16-microcard v17-microcard v18-microcard card-b">
+              <span className="micro-icon"><FileText size={18} /></span>
+              <div className="micro-content">
+                <strong>Relatos</strong>
+                <small>Registre e consulte<br/>informações.</small>
+              </div>
+              <span className="micro-arrow"><ChevronRight size={18} /></span>
+            </div>
+            <div className="v16-microcard v17-microcard v18-microcard card-c">
+              <span className="micro-icon"><UsersRound size={18} /></span>
+              <div className="micro-content">
+                <strong>Operação</strong>
+                <small>Equipes conectadas<br/>para mais resultado.</small>
+              </div>
+              <span className="micro-arrow"><ChevronRight size={18} /></span>
+            </div>
+            <div className="dot-cluster cluster-a" />
+            <div className="dot-cluster cluster-b" />
+            <div className="dot-cluster cluster-c" />
+          </div>
         </div>
 
-        <div className="v16-microcards v17-microcards" aria-hidden="true">
-          <div className="v16-microcard v17-microcard card-a">
-            <span className="micro-icon"><CalendarClock size={18} /></span>
-            <div className="micro-content">
-              <strong>Agendamentos</strong>
-              <small>Organize e acompanhe<br/>as demandas.</small>
-            </div>
-            <span className="micro-arrow"><ChevronRight size={18} /></span>
-          </div>
-          <div className="v16-microcard v17-microcard card-b">
-            <span className="micro-icon"><FileText size={18} /></span>
-            <div className="micro-content">
-              <strong>Relatos</strong>
-              <small>Registre e consulte<br/>informações.</small>
-            </div>
-            <span className="micro-arrow"><ChevronRight size={18} /></span>
-          </div>
-          <div className="v16-microcard v17-microcard card-c">
-            <span className="micro-icon"><UsersRound size={18} /></span>
-            <div className="micro-content">
-              <strong>Operação</strong>
-              <small>Equipes conectadas<br/>para mais resultado.</small>
-            </div>
-            <span className="micro-arrow"><ChevronRight size={18} /></span>
-          </div>
-          <div className="dot-cluster cluster-a" />
-          <div className="dot-cluster cluster-b" />
-          <div className="dot-cluster cluster-c" />
-        </div>
-
-        <div className="v15-feature-stack v17-feature-stack">
+        <div className="v15-feature-stack v17-feature-stack v18-feature-stack">
           <div><UsersRound size={16} /><span>Equipe, operação e atendimento conectados</span></div>
           <div><CalendarClock size={16} /><span>Visão organizada da agenda interna</span></div>
           <div><ShieldCheck size={16} /><span>Ambiente interno com acesso controlado</span></div>
@@ -144,7 +146,7 @@ export default function LoginPage() {
         </div>
       </section>
 
-      <section className="login-panel clean-panel v15-panel v17-panel">
+      <section className="login-panel clean-panel v15-panel v17-panel v18-panel">
         <div className="login-panel-wrap clean-wrap">
           <Suspense fallback={<div className="spinner" />}>
             <LoginForm />
