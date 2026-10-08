@@ -1229,3 +1229,102 @@
   .cluster-b{top:150px!important;left:82px!important}
   .cluster-c{top:226px!important;left:388px!important}
 }
+
+/* V1.17 final balance pass */
+.v18-feature-stack{
+  width:390px!important;
+  max-width:390px!important;
+  bottom:38px!important;
+  gap:12px!important;
+}
+.v18-feature-stack>div{
+  padding:13px 15px!important;
+  border-radius:18px!important;
+}
+.v18-feature-stack>div span{
+  font-size:12.5px!important;
+}
+.v17-footer{
+  bottom:10px!important;
+}
+
+.v18-microcards{
+  min-height:340px!important;
+}
+.v18-microcard{
+  width:250px!important;
+  min-height:102px!important;
+  padding:15px 16px!important;
+}
+.v18-microcard strong{font-size:15px!important}
+.v18-microcard small{font-size:12px!important;line-height:1.4!important}
+.v18-microcard .micro-icon{
+  width:46px!important;
+  height:46px!important;
+}
+.v18-microcard.card-a{
+  top:-58px!important;
+  left:84px!important;
+}
+.v18-microcard.card-b{
+  top:74px!important;
+  left:238px!important;
+}
+.v18-microcard.card-c{
+  top:198px!important;
+  left:132px!important;
+}
+.cluster-a{top:28px!important;left:352px!important}
+.cluster-b{top:146px!important;left:96px!important}
+.cluster-c{top:230px!important;left:402px!important}
+
+@media(max-height:820px) and (min-width:981px){
+  .v18-hero-grid{
+    margin-top:40px!important;
+  }
+  .v18-copy-block h1{
+    font-size:clamp(50px,4.25vw,60px)!important;
+    max-width:430px!important;
+  }
+  .v18-feature-stack{
+    width:370px!important;
+    max-width:370px!important;
+    bottom:34px!important;
+    gap:10px!important;
+  }
+  .v18-feature-stack>div{
+    padding:12px 14px!important;
+  }
+  .v18-feature-stack>div span{
+    font-size:12px!important;
+  }
+  .v18-microcards{
+    min-height:308px!important;
+  }
+  .v18-microcard{
+    width:236px!important;
+    min-height:96px!important;
+    padding:14px 15px!important;
+  }
+  .v18-microcard strong{font-size:14px!important}
+  .v18-microcard small{font-size:11.5px!important}
+  .v18-microcard .micro-icon{
+    width:44px!important;
+    height:44px!important;
+  }
+  .v18-microcard.card-a{
+    top:-62px!important;
+    left:76px!important;
+  }
+  .v18-microcard.card-b{
+    top:62px!important;
+    left:220px!important;
+  }
+  .v18-microcard.card-c{
+    top:176px!important;
+    left:120px!important;
+  }
+  .cluster-a{top:22px!important;left:328px!important}
+  .cluster-b{top:130px!important;left:90px!important}
+  .cluster-c{top:206px!important;left:374px!important}
+}
