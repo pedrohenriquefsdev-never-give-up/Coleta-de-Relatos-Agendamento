@@ -74,6 +74,12 @@ export async function PUT(req: NextRequest, { params }: { params: Promise<{ uid:
     return Response.json({ ok: true });
   } catch (e: any) {
     const status = e?.message === "UNAUTHORIZED" ? 401 : e?.message === "FORBIDDEN" ? 403 : e?.message === "INVALID" ? 400 : 500;
-    return Response.json({ error: status === 400 ? "Configuração VTCall inválida." : "Não foi possível salvar a configuração." }, { status });
+    const message =
+      status === 400
+        ? "Configuração VTCall inválida."
+        : String(e?.message || "").includes("VTCALL_CREDENTIALS_ENCRYPTION_KEY")
+          ? "A chave de criptografia do VTCall ainda não foi configurada na Vercel."
+          : "Não foi possível salvar a configuração.";
+    return Response.json({ error: message }, { status });
   }
 }

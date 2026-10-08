@@ -10,6 +10,16 @@ import Modal from "./Modal";
 const DEPARTMENTS = ["Atendimento", "Cadastro", "Comercial", "Operação", "Rastreamento", "Administrativo", "Marketing"];
 const DEFAULT_VTCALL = { host: "sip23.vtcall.app", extension: "", password: "", port: 5068, transport: "UDP" };
 
+async function readJsonSafe(res: Response) {
+  const text = await res.text();
+  if (!text) return {};
+  try {
+    return JSON.parse(text);
+  } catch {
+    return { error: `Resposta inválida do servidor (HTTP ${res.status}).` };
+  }
+}
+
 export default function UserManager() {
   const [users, setUsers] = useState<AppUser[]>([]);
   const [open, setOpen] = useState(false);
@@ -33,8 +43,8 @@ export default function UserManager() {
       headers: { "Content-Type": "application/json", Authorization: `Bearer ${await token()}` },
       body: JSON.stringify(config),
     });
-    const data = await res.json();
-    if (!res.ok) throw new Error(data.error || "Não foi possível salvar o VTCall.");
+    const data = await readJsonSafe(res);
+    if (!res.ok) throw new Error(data.error || `Não foi possível salvar o VTCall (HTTP ${res.status}).`);
   }
 
   async function create() {
@@ -51,7 +61,7 @@ export default function UserManager() {
         headers: { "Content-Type": "application/json", Authorization: `Bearer ${await token()}` },
         body: JSON.stringify({ ...form, department: finalDepartment, cpf: form.cpf.replace(/\D/g, "") }),
       });
-      const data = await res.json();
+      const data = await readJsonSafe(res);
       if (!res.ok) throw new Error(data.error || "Erro ao criar usuário");
       await saveVTCallFor(data.uid);
       setForm({ name: "", email: "", cpf: "", role: "atendente", department: "Atendimento" });
@@ -79,7 +89,7 @@ export default function UserManager() {
     setLoadingVT(true);
     try {
       const res = await fetch(`/api/admin/users/${u.uid}/vtcall`, { headers: { Authorization: `Bearer ${await token()}` } });
-      const data = await res.json();
+      const data = await readJsonSafe(res);
       if (res.ok && data.configured) setVtcall({ host: data.host, extension: data.extension, password: data.password, port: Number(data.port || 5068), transport: data.transport || "UDP" });
     } finally { setLoadingVT(false); }
   }
@@ -97,8 +107,8 @@ export default function UserManager() {
         headers: { "Content-Type": "application/json", Authorization: `Bearer ${await token()}` },
         body: JSON.stringify({ department }),
       });
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.error || "Não foi possível atualizar.");
+      const data = await readJsonSafe(res);
+      if (!res.ok) throw new Error(data.error || `Não foi possível atualizar o usuário (HTTP ${res.status}).`);
       if (wantsVTCall) await saveVTCallFor(editing.uid);
       setEditing(null); setOtherDepartment(""); setVtcall(DEFAULT_VTCALL);
     } catch (e) { setError(e instanceof Error ? e.message : "Erro"); }
