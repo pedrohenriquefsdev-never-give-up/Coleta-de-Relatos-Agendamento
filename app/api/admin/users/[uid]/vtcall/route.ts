@@ -55,21 +55,21 @@ export async function PUT(req: NextRequest, { params }: { params: Promise<{ uid:
       updatedBy: actor.uid,
     }, { merge: true });
 
-    await adminDb().collection("users").doc(uid).update({
+    await adminDb().collection("users").doc(uid).set({
       vtcallConfigured: true,
       vtcallExtension: value.extension,
       updatedAt: FieldValue.serverTimestamp(),
-    });
+    }, { merge: true });
 
-    await adminDb().collection("auditLogs").add({
+    adminDb().collection("auditLogs").add({
       userId: actor.uid,
-      userName: actor.name,
-      userEmail: actor.email,
+      userName: actor.name || actor.email || "Administrador",
+      userEmail: actor.email || "",
       action: "VTCALL_CREDENTIALS_UPDATED",
       targetId: uid,
       details: { extension: value.extension, host: value.host },
       createdAt: FieldValue.serverTimestamp(),
-    });
+    }).catch(() => undefined);
 
     return Response.json({ ok: true });
   } catch (e: any) {
@@ -79,7 +79,9 @@ export async function PUT(req: NextRequest, { params }: { params: Promise<{ uid:
         ? "Configuração VTCall inválida."
         : String(e?.message || "").includes("VTCALL_CREDENTIALS_ENCRYPTION_KEY")
           ? "A chave de criptografia do VTCall ainda não foi configurada na Vercel."
-          : "Não foi possível salvar a configuração.";
+          : String(e?.message || "").includes("Firebase Admin não configurado")
+            ? "Firebase Admin não está configurado corretamente na Vercel."
+            : "Não foi possível salvar a configuração.";
     return Response.json({ error: message }, { status });
   }
 }

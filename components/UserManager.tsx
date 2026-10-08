@@ -108,8 +108,14 @@ export default function UserManager() {
         body: JSON.stringify({ department }),
       });
       const data = await readJsonSafe(res);
-      if (!res.ok) throw new Error(data.error || `Não foi possível atualizar o usuário (HTTP ${res.status}).`);
-      if (wantsVTCall) await saveVTCallFor(editing.uid);
+      if (!res.ok) throw new Error(`Perfil: ${data.error || `falha HTTP ${res.status}`}`);
+      if (wantsVTCall) {
+        try {
+          await saveVTCallFor(editing.uid);
+        } catch (vtError) {
+          throw new Error(`VTCall: ${vtError instanceof Error ? vtError.message : "não foi possível salvar a configuração."}`);
+        }
+      }
       setEditing(null); setOtherDepartment(""); setVtcall(DEFAULT_VTCALL);
     } catch (e) { setError(e instanceof Error ? e.message : "Erro"); }
     finally { setLoading(false); }
