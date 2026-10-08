@@ -1,7 +1,7 @@
 "use client";
 
 import { signInWithEmailAndPassword } from "firebase/auth";
-import { ArrowRight, CalendarClock, LockKeyhole, Mail, ShieldCheck, UsersRound } from "lucide-react";
+import { ArrowRight, CalendarClock, FileText, LockKeyhole, Mail, ShieldCheck, UsersRound } from "lucide-react";
 import { useSearchParams, useRouter } from "next/navigation";
 import { FormEvent, Suspense, useState } from "react";
 import { auth } from "@/lib/firebase";
@@ -101,6 +101,30 @@ export default function LoginPage() {
           <span className="clean-eyebrow">GESTÃO INTERNA</span>
           <h1>Controle interno com mais clareza.</h1>
           <p>Agendamentos, contatos e registros reunidos em um só portal.</p>
+        </div>
+
+        <div className="v16-microcards" aria-hidden="true">
+          <div className="v16-microcard card-a">
+            <span className="micro-icon"><CalendarClock size={16} /></span>
+            <div>
+              <strong>Agendamentos</strong>
+              <small>Organize e acompanhe a agenda interna.</small>
+            </div>
+          </div>
+          <div className="v16-microcard card-b">
+            <span className="micro-icon"><FileText size={16} /></span>
+            <div>
+              <strong>Relatos</strong>
+              <small>Registre e consulte informações com agilidade.</small>
+            </div>
+          </div>
+          <div className="v16-microcard card-c">
+            <span className="micro-icon"><UsersRound size={16} /></span>
+            <div>
+              <strong>Operação</strong>
+              <small>Equipe conectada para uma rotina mais clara.</small>
+            </div>
+          </div>
         </div>
 
         <div className="v15-feature-stack">
