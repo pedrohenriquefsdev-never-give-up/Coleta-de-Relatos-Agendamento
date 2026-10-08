@@ -598,3 +598,102 @@
     margin-top:26px!important;
   }
 }
+
+/* V1.9 fine tune */
+.v18-hero-grid{
+  margin-top:56px!important;
+  grid-template-columns:minmax(360px,.96fr) minmax(320px,1.04fr)!important;
+  gap:30px!important;
+}
+.v18-copy-block h1{
+  font-size:clamp(52px,4.7vw,68px)!important;
+  max-width:560px!important;
+  line-height:.93!important;
+}
+.v18-microcards{
+  min-height:295px!important;
+}
+.v18-microcard{
+  width:min(255px,78%)!important;
+  padding:15px 16px!important;
+}
+.v18-microcard.card-a{
+  top:-4px!important;
+  left:18px!important;
+}
+.v18-microcard.card-b{
+  top:92px!important;
+  left:108px!important;
+}
+.v18-microcard.card-c{
+  top:184px!important;
+  left:36px!important;
+}
+.v18-microcard strong{font-size:14px!important}
+.v18-microcard small{font-size:11.5px!important;line-height:1.42!important}
+.v18-microcard .micro-icon{
+  width:42px!important;
+  height:42px!important;
+}
+.cluster-a{top:58px!important;left:292px!important}
+.cluster-b{top:172px!important;left:70px!important}
+.cluster-c{top:238px!important;left:330px!important}
+.v18-feature-stack{
+  bottom:52px!important;
+  width:min(560px,calc(100% - 60px))!important;
+  gap:11px!important;
+}
+.v18-feature-stack>div{
+  padding:13px 16px!important;
+}
+.v18-feature-stack>div span{
+  font-size:13px!important;
+}
+.v17-footer{
+  bottom:18px!important;
+  font-size:10.5px!important;
+}
+.v18-panel .login-panel-wrap{
+  width:min(420px,100%)!important;
+}
+.v18-login-card{
+  padding:24px 22px 20px!important;
+}
+.v18-login-card .login-card-topline h2{
+  font-size:36px!important;
+  max-width:176px!important;
+}
+.v18-login-card .login-intro{
+  font-size:12.5px!important;
+  line-height:1.45!important;
+}
+.v18-login-card .vehicle-plate.wide{
+  width:156px!important;
+}
+.v18-login-card .login-tip.clean{
+  padding:10px 12px!important;
+  margin-bottom:14px!important;
+}
+.v18-login-card .field label{font-size:11.5px!important}
+.v18-login-card .input{min-height:48px!important}
+.v18-login-card .btn.primary{min-height:52px!important}
+.v18-login-mini-features{gap:10px!important}
+.v18-login-mini-features>div{padding:10px 11px!important}
+
+@media(max-width:1500px){
+  .v18-hero-grid{
+    margin-top:48px!important;
+  }
+  .v18-copy-block h1{
+    font-size:clamp(50px,4.4vw,62px)!important;
+  }
+}
+@media(max-height:800px) and (min-width:981px){
+  .v18-hero-grid{margin-top:42px!important}
+  .v18-copy-block h1{font-size:clamp(48px,4.2vw,58px)!important}
+  .v18-microcards{min-height:270px!important}
+  .v18-microcard.card-b{top:84px!important;left:98px!important}
+  .v18-microcard.card-c{top:170px!important;left:28px!important}
+  .v18-feature-stack{bottom:44px!important}
+  .v17-footer{bottom:14px!important}
+}
