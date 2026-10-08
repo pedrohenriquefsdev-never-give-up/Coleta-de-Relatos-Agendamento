@@ -812,3 +812,62 @@
     bottom:10px!important;
   }
 }
+
+/* V1.11 microcard reposition based on review */
+.v18-microcards{
+  min-height:342px!important;
+  margin-top:2px!important;
+}
+.v18-microcard{
+  width:min(226px,68%)!important;
+  padding:14px 15px!important;
+}
+.v18-microcard.card-a{
+  top:-26px!important;
+  left:76px!important;
+}
+.v18-microcard.card-b{
+  top:110px!important;
+  left:216px!important;
+}
+.v18-microcard.card-c{
+  top:246px!important;
+  left:78px!important;
+}
+.cluster-a{top:98px!important;left:318px!important}
+.cluster-b{top:268px!important;left:154px!important}
+.cluster-c{top:284px!important;left:394px!important}
+.v18-feature-stack{
+  bottom:58px!important;
+}
+
+@media(max-height:800px) and (min-width:981px){
+  .v18-microcards{
+    min-height:320px!important;
+  }
+  .v18-microcard{
+    width:min(214px,66%)!important;
+    padding:13px 14px!important;
+  }
+  .v18-microcard.card-a{
+    top:-20px!important;
+    left:66px!important;
+  }
+  .v18-microcard.card-b{
+    top:102px!important;
+    left:194px!important;
+  }
+  .v18-microcard.card-c{
+    top:226px!important;
+    left:68px!important;
+  }
+  .cluster-a{top:92px!important;left:292px!important}
+  .cluster-b{top:248px!important;left:136px!important}
+  .cluster-c{top:262px!important;left:362px!important}
+}
+
+@media(max-width:1180px){
+  .v18-microcards{
+    min-height:0!important;
+  }
+}
