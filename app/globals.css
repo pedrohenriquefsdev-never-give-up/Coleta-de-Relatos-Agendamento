@@ -1421,3 +1421,20 @@
   .cluster-b{top:114px!important;left:90px!important}
   .cluster-c{top:176px!important;left:378px!important}
 }
+
+/* V1.19 - raise bottom feature stack only */
+.v18-feature-stack{
+  bottom:78px!important;
+}
+.v17-footer{
+  bottom:12px!important;
+}
+
+@media(max-height:820px) and (min-width:981px){
+  .v18-feature-stack{
+    bottom:74px!important;
+  }
+  .v17-footer{
+    bottom:10px!important;
+  }
+}
