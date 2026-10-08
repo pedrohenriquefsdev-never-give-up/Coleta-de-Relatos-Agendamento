@@ -1024,3 +1024,117 @@
   .cluster-b{top:140px!important;left:156px!important}
   .cluster-c{top:180px!important;left:358px!important}
 }
+
+/* V1.15 - hard alignment toward approved mockup */
+.v18-hero-grid{
+  margin-top:72px!important;
+  grid-template-columns:minmax(320px,.88fr) minmax(360px,1.12fr)!important;
+  gap:34px!important;
+  align-items:start!important;
+}
+.v18-copy-block h1{
+  font-size:clamp(62px,5.1vw,84px)!important;
+  max-width:520px!important;
+  line-height:.90!important;
+}
+.v18-microcards{
+  min-height:395px!important;
+  margin-top:0!important;
+}
+.v18-microcard{
+  width:290px!important;
+  min-height:118px!important;
+  padding:18px 20px!important;
+  border-radius:24px!important;
+}
+.v18-microcard strong{font-size:17px!important;margin-bottom:6px!important}
+.v18-microcard small{font-size:13px!important;line-height:1.45!important}
+.v18-microcard .micro-icon{
+  width:56px!important;
+  height:56px!important;
+  border-radius:16px!important;
+}
+.v18-microcard .micro-arrow svg{width:20px!important;height:20px!important}
+.v18-microcard.card-a{
+  top:-8px!important;
+  left:58px!important;
+}
+.v18-microcard.card-b{
+  top:148px!important;
+  left:240px!important;
+}
+.v18-microcard.card-c{
+  top:286px!important;
+  left:108px!important;
+}
+.cluster-a{top:64px!important;left:350px!important}
+.cluster-b{top:202px!important;left:84px!important}
+.cluster-c{top:314px!important;left:420px!important}
+.v18-feature-stack{
+  width:540px!important;
+  max-width:540px!important;
+  bottom:34px!important;
+  gap:14px!important;
+}
+.v18-feature-stack>div{
+  padding:16px 18px!important;
+  border-radius:20px!important;
+}
+.v18-feature-stack>div span{
+  font-size:14px!important;
+}
+.v17-footer{bottom:12px!important}
+.v18-panel .login-panel-wrap{width:min(458px,100%)!important}
+.v18-login-card{
+  padding:28px 24px 22px!important;
+  border-radius:30px!important;
+}
+.v18-login-card .login-card-topline h2{
+  font-size:44px!important;
+  max-width:200px!important;
+}
+.v18-login-card .login-intro{
+  font-size:14px!important;
+  max-width:320px!important;
+}
+.v18-login-card .vehicle-plate.wide{width:172px!important}
+.v18-login-card .plate-top{height:17px!important}
+.v18-login-card .btn.primary{min-height:56px!important}
+.v18-login-mini-features>div{padding:12px 14px!important;font-size:12px!important}
+
+@media(max-width:1500px){
+  .v18-copy-block h1{font-size:clamp(58px,4.8vw,76px)!important}
+  .v18-microcard{width:272px!important}
+  .v18-microcard.card-a{left:44px!important}
+  .v18-microcard.card-b{left:214px!important}
+  .v18-microcard.card-c{left:92px!important}
+  .cluster-a{left:330px!important}
+  .cluster-c{left:398px!important}
+  .v18-feature-stack{width:510px!important;max-width:510px!important}
+}
+@media(max-height:820px) and (min-width:981px){
+  .v18-hero-grid{margin-top:54px!important}
+  .v18-copy-block h1{font-size:clamp(56px,4.6vw,70px)!important}
+  .v18-microcards{min-height:350px!important}
+  .v18-microcard{width:260px!important;min-height:108px!important;padding:16px 18px!important}
+  .v18-microcard strong{font-size:15px!important}
+  .v18-microcard small{font-size:12px!important}
+  .v18-microcard .micro-icon{width:50px!important;height:50px!important}
+  .v18-microcard.card-a{top:-6px!important;left:50px!important}
+  .v18-microcard.card-b{top:132px!important;left:206px!important}
+  .v18-microcard.card-c{top:252px!important;left:96px!important}
+  .cluster-a{top:58px!important;left:314px!important}
+  .cluster-b{top:188px!important;left:74px!important}
+  .cluster-c{top:278px!important;left:376px!important}
+  .v18-feature-stack{width:480px!important;max-width:480px!important;bottom:26px!important;gap:12px!important}
+  .v18-feature-stack>div{padding:14px 16px!important}
+  .v18-feature-stack>div span{font-size:13px!important}
+  .v18-login-card{padding:24px 22px 20px!important}
+  .v18-login-card .login-card-topline h2{font-size:40px!important}
+  .v18-login-card .login-intro{font-size:13px!important}
+}
+@media(max-width:1180px){
+  .v18-microcards{min-height:0!important}
+  .v18-microcard{width:100%!important;min-height:auto!important}
+  .v18-feature-stack{width:100%!important;max-width:none!important;bottom:auto!important}
+}
