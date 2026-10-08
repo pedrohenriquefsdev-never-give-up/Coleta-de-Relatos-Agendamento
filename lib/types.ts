@@ -9,6 +9,8 @@ export interface AppUser {
   active: boolean;
   photoUrl?: string;
   department?: string;
+  vtcallConfigured?: boolean;
+  vtcallExtension?: string;
   cpfLast4?: string;
   createdAt?: unknown;
   lastAccessAt?: unknown;
@@ -38,5 +40,9 @@ export interface Appointment {
     recordingUrl?: string;
     startedAt?: unknown;
     endedAt?: unknown;
+    requestedAt?: unknown;
+    lastAttemptId?: string;
+    extension?: string;
+    phone?: string;
   };
 }

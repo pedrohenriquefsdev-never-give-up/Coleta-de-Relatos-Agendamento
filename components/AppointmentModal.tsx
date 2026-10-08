@@ -1,7 +1,7 @@
 "use client";
 
 import { addDoc, collection, deleteDoc, doc, serverTimestamp, updateDoc } from "firebase/firestore";
-import { ExternalLink, PhoneCall, Trash2 } from "lucide-react";
+import { PhoneCall, Trash2 } from "lucide-react";
 import { useMemo, useState } from "react";
 import { db } from "@/lib/firebase";
 import { useSession } from "./AuthGate";
@@ -35,6 +35,8 @@ export default function AppointmentModal({
   const { user, profile } = useSession();
   const [saving, setSaving] = useState(false);
   const [deleting, setDeleting] = useState(false);
+  const [calling, setCalling] = useState(false);
+  const [callMessage, setCallMessage] = useState("");
   const [error, setError] = useState("");
   const [form, setForm] = useState({
     plate: initial?.plate || "",
@@ -50,29 +52,25 @@ export default function AppointmentModal({
 
   const title = useMemo(() => (initial ? `Agendamento • ${initial.plate}` : "Novo agendamento"), [initial]);
   const canDelete = !!initial && profile?.role === "admin";
-  const vtcallDialUrl = process.env.NEXT_PUBLIC_VTCALL_DIAL_URL || "";
 
-  function openVTCall() {
+  async function openVTCall() {
     const phone = cleanPhone(form.phone);
     if (!phone) return setError("Informe um telefone válido antes de iniciar a ligação.");
-    if (!vtcallDialUrl) {
-      return setError("VTCall ainda não está configurado. Aguardando a documentação/API para concluir a integração.");
-    }
-
-    let target = vtcallDialUrl;
-    if (target.includes("{phone}")) {
-      target = target.replaceAll("{phone}", encodeURIComponent(phone));
-    } else {
-      try {
-        const url = new URL(target);
-        url.searchParams.set("phone", phone);
-        target = url.toString();
-      } catch {
-        target = `${target}${target.includes("?") ? "&" : "?"}phone=${encodeURIComponent(phone)}`;
-      }
-    }
-
-    window.open(target, "_blank", "noopener,noreferrer");
+    if (!initial) return setError("Salve o agendamento antes de iniciar uma ligação.");
+    setError(""); setCallMessage(""); setCalling(true);
+    try {
+      const token = await user?.getIdToken();
+      const res = await fetch("/api/vtcall/call", {
+        method: "POST",
+        headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+        body: JSON.stringify({ phone, appointmentId: initial.id }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || "Não foi possível iniciar a ligação.");
+      setCallMessage(data.message || "Ligação solicitada. Aguarde o seu ramal tocar.");
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Não foi possível iniciar a ligação.");
+    } finally { setCalling(false); }
   }
 
   async function save() {
@@ -194,10 +192,9 @@ export default function AppointmentModal({
             <div className="phone-field-wrap">
               <input className="input" value={form.phone} onChange={(e) => setForm({ ...form, phone: cleanPhone(e.target.value) })} placeholder="81999999999" />
               {initial && (
-                <button type="button" className="phone-vtcall-btn" onClick={openVTCall} title="Abrir no VTCall">
+                <button type="button" className="phone-vtcall-btn" onClick={openVTCall} disabled={calling} title="Ligar pelo VTCall">
                   <PhoneCall size={15} />
-                  <span>{form.phone || "Ligar via VTCall"}</span>
-                  <ExternalLink size={13} />
+                  <span>{calling ? "Chamando..." : (form.phone || "Ligar via VTCall")}</span>
                 </button>
               )}
             </div>
@@ -244,10 +241,9 @@ export default function AppointmentModal({
           <textarea className="textarea" value={form.notes} onChange={(e) => setForm({ ...form, notes: e.target.value })} placeholder="Informações adicionais..." />
         </div>
 
+        {callMessage && <div className="success">{callMessage}</div>}
         {initial?.call?.callId && (
-          <div className="success">
-            Ligação VTCall vinculada: <strong>{initial.call.callId}</strong>
-          </div>
+          <div className="success">Ligação VTCall vinculada: <strong>{initial.call.callId}</strong></div>
         )}
       </div>
     </Modal>

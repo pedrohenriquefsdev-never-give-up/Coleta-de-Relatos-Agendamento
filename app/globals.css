@@ -1627,3 +1627,56 @@
     justify-content:center;
   }
 }
+
+/* V1.22 - VTCall installer/setup module */
+.sidebar{overflow-y:auto;scrollbar-width:thin}
+.vt-sidebar-module{
+  margin:20px 5px 0;
+  padding:13px;
+  border:1px solid #292a27;
+  border-radius:16px;
+  background:linear-gradient(180deg,rgba(244,196,0,.05),rgba(255,255,255,.018));
+}
+.vt-sidebar-head{display:flex;align-items:center;gap:9px}
+.vt-sidebar-head>span{width:32px;height:32px;border-radius:10px;display:grid;place-items:center;background:rgba(244,196,0,.10);border:1px solid rgba(244,196,0,.18);color:var(--yellow)}
+.vt-sidebar-head div{display:flex;flex-direction:column;min-width:0}
+.vt-sidebar-head strong{font-size:12px;color:#fff}
+.vt-sidebar-head small{font-size:9px;color:#858681;margin-top:2px}
+.vt-sidebar-actions{display:grid;grid-template-columns:1fr 1fr;gap:7px;margin-top:10px}
+.vt-sidebar-btn{min-height:32px;border:1px solid #30312e;border-radius:9px;background:#181916;color:#ddd;display:flex;align-items:center;justify-content:center;gap:5px;font-size:9.5px;font-weight:750;text-decoration:none;cursor:pointer}
+.vt-sidebar-btn:hover{border-color:rgba(244,196,0,.34);color:#fff}
+.vt-sidebar-btn.primary{background:var(--yellow);border-color:var(--yellow);color:#111}
+.sidebar-profile-card{margin-top:18px}
+.vt-download-banner{display:flex;align-items:center;justify-content:space-between;gap:16px;padding:14px;border:1px solid rgba(244,196,0,.16);background:rgba(244,196,0,.06);border-radius:15px}
+.vt-download-banner>div{display:flex;align-items:center;gap:10px;color:var(--yellow)}
+.vt-download-banner span{display:flex;flex-direction:column;color:var(--text)}
+.vt-download-banner strong{font-size:13px}
+.vt-download-banner small{font-size:10px;color:var(--muted);margin-top:2px}
+.vt-steps{display:grid;gap:8px}
+.vt-steps>div{display:flex;align-items:flex-start;gap:10px;padding:10px 12px;border:1px solid var(--line);border-radius:12px;background:var(--surface-soft)}
+.vt-steps b{width:22px;height:22px;display:grid;place-items:center;border-radius:50%;background:rgba(244,196,0,.12);color:var(--yellow);font-size:10px;flex-shrink:0}
+.vt-steps span{font-size:11px;color:var(--muted);line-height:1.45;padding-top:2px}
+.vt-steps strong{color:var(--text)}
+.vt-credentials-box{border:1px solid var(--line);border-radius:15px;padding:14px;background:var(--surface-soft)}
+.vt-credentials-title{display:flex;align-items:center;gap:9px;margin-bottom:10px;color:var(--yellow)}
+.vt-credentials-title>div{display:flex;flex-direction:column}
+.vt-credentials-title strong{font-size:12px;color:var(--text)}
+.vt-credentials-title small{font-size:9px;color:var(--muted);margin-top:2px}
+.vt-copy-row{display:flex;align-items:center;justify-content:space-between;gap:10px;padding:9px 0;border-top:1px solid var(--line)}
+.vt-copy-row:first-of-type{border-top:0}
+.vt-copy-row>div:first-child{display:flex;flex-direction:column;min-width:0}
+.vt-copy-row small{font-size:9px;color:var(--muted);text-transform:uppercase;letter-spacing:.06em}
+.vt-copy-row strong{font-size:12px;color:var(--text);margin-top:2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:390px}
+.vt-copy-actions{display:flex;gap:5px;flex-shrink:0}
+.icon-btn.mini{width:30px;height:30px;border-radius:9px}
+.vt-admin-box{margin-top:4px;padding:14px;border:1px solid rgba(244,196,0,.14);border-radius:14px;background:rgba(244,196,0,.035)}
+.vt-admin-head{display:flex;align-items:center;gap:9px;color:var(--yellow);margin-bottom:12px}
+.vt-admin-head>div{display:flex;flex-direction:column}
+.vt-admin-head strong{font-size:12px;color:var(--text)}
+.vt-admin-head small{font-size:9px;color:var(--muted);margin-top:2px}
+.phone-vtcall-btn:disabled{opacity:.65;cursor:wait;transform:none}
+@media(max-height:760px) and (min-width:981px){
+  .vt-sidebar-module{margin-top:12px;padding:10px}
+  .sidebar-profile-card{margin-top:12px;padding:12px 10px}
+  .sidebar-profile-photo{width:76px;height:76px;border-radius:20px}
+}

@@ -30,6 +30,7 @@ import Plate from "./Plate";
 import ProfilePanel from "./ProfilePanel";
 import ThemeToggle from "./ThemeToggle";
 import UserManager from "./UserManager";
+import VTCallSidebarModule from "./VTCallSidebarModule";
 
 const hours = [
   "08:00",
@@ -59,6 +60,8 @@ const actions: Record<string, string> = {
   USER_CREATED: "Criou usuário",
   USER_UPDATED: "Alterou usuário",
   PROFILE_PHOTO_UPDATED: "Atualizou foto do perfil",
+  VTCALL_CREDENTIALS_UPDATED: "Atualizou configuração VTCall",
+  VTCALL_CALL_REQUESTED: "Solicitou ligação VTCall",
 };
 
 const tabLabels: Record<string, string> = {
@@ -332,6 +335,8 @@ export default function Dashboard() {
           <button className={tab === "logs" ? "active" : ""} onClick={() => setTab("logs")}><History size={18} /> Logs</button>
           <button className={tab === "perfil" ? "active" : ""} onClick={() => setTab("perfil")}><UserRound size={18} /> Meu perfil</button>
         </div>
+
+        <VTCallSidebarModule />
 
         <div className="sidebar-profile-card" onClick={() => setTab("perfil")}>
           {currentProfile.photoUrl ? (
