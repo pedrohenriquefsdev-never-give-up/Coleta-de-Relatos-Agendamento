@@ -1,0 +1,2 @@
+Portal Coleta de Relatos - V1.39.2
+Multiple appointments per day, responsible assignment and overlap conflict validation.

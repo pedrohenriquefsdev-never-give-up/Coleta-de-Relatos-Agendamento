@@ -6,7 +6,7 @@ import { useEffect, useMemo, useState } from "react";
 import { db } from "@/lib/firebase";
 import { useSession } from "./AuthGate";
 import Modal from "./Modal";
-import type { Appointment, AppointmentStatus } from "@/lib/types";
+import type { AppUser, Appointment, AppointmentStatus } from "@/lib/types";
 
 const cleanPlate = (v: string) => v.toUpperCase().replace(/[^A-Z0-9]/g, "").slice(0, 7);
 const cleanPhone = (v: string) => v.replace(/\D/g, "").slice(0, 11);
@@ -56,6 +56,7 @@ export default function AppointmentModal({
   defaultDate,
   defaultTime,
   existingAppointments = [],
+  availableUsers = [],
   readOnly = false,
   onClose,
   onSaved,
@@ -64,6 +65,7 @@ export default function AppointmentModal({
   defaultDate?: string;
   defaultTime?: string;
   existingAppointments?: Appointment[];
+  availableUsers?: AppUser[];
   readOnly?: boolean;
   onClose: () => void;
   onSaved: () => void;
@@ -86,6 +88,8 @@ export default function AppointmentModal({
     date: initial?.date || defaultDate || new Date().toISOString().slice(0, 10),
     time: initial?.time || defaultTime || "08:00",
     durationMinutes: initial?.durationMinutes || 30,
+    assignedTo: initial?.assignedTo || initial?.createdBy || profile?.uid || "",
+    assignedToName: initial?.assignedToName || initial?.createdByName || profile?.name || "",
     status: ((initial?.status === "atendido" ? "concluido" : initial?.status) || "agendado") as AppointmentStatus,
     notes: initial?.notes || "",
   });
@@ -93,23 +97,53 @@ export default function AppointmentModal({
   const title = useMemo(() => (initial ? `Agendamento • ${initial.plate}` : "Novo agendamento"), [initial]);
   const canDelete = !!initial && !readOnly && profile?.role === "admin";
 
+  const operationalUsers = useMemo(
+    () => availableUsers.filter((item) => item.active && (item.role === "admin" || item.role === "atendente")),
+    [availableUsers],
+  );
+
   const duplicateMatches = useMemo(() => {
     const plate = cleanPlate(form.plate);
     const phone = cleanPhone(form.phone);
-    if ((!plate && !phone) || !form.date) return [];
+    if ((!plate && !phone) || !form.date || !form.time) return [];
 
-    const target = new Date(`${form.date}T12:00:00`).getTime();
+    const toMinutes = (value: string) => {
+      const [hours, minutes] = value.split(":").map(Number);
+      return hours * 60 + minutes;
+    };
+    const targetMinutes = toMinutes(form.time);
+
     return existingAppointments
-      .filter((item) => item.id !== initial?.id && item.status !== "cancelado")
+      .filter((item) => item.id !== initial?.id && item.status !== "cancelado" && item.date === form.date)
       .filter((item) => {
         const samePlate = plate.length >= 7 && cleanPlate(item.plate) === plate;
         const samePhone = phone.length >= 8 && cleanPhone(item.phoneDigits || item.phone) === phone;
         if (!samePlate && !samePhone) return false;
-        const itemDate = new Date(`${item.date}T12:00:00`).getTime();
-        return Math.abs(itemDate - target) <= 86400000;
+        return Math.abs(toMinutes(item.time) - targetMinutes) <= 120;
       })
       .slice(0, 3);
-  }, [existingAppointments, form.date, form.phone, form.plate, initial?.id]);
+  }, [existingAppointments, form.date, form.phone, form.plate, form.time, initial?.id]);
+
+  const scheduleConflicts = useMemo(() => {
+    if (!form.date || !form.time || !form.assignedTo) return [];
+
+    const toMinutes = (value: string) => {
+      const [hours, minutes] = value.split(":").map(Number);
+      return hours * 60 + minutes;
+    };
+    const startsAt = toMinutes(form.time);
+    const endsAt = startsAt + Number(form.durationMinutes || 30);
+
+    return existingAppointments
+      .filter((item) => item.id !== initial?.id && item.status !== "cancelado" && item.date === form.date)
+      .filter((item) => (item.assignedTo || item.createdBy) === form.assignedTo)
+      .filter((item) => {
+        const itemStart = toMinutes(item.time);
+        const itemEnd = itemStart + Number(item.durationMinutes || 30);
+        return startsAt < itemEnd && endsAt > itemStart;
+      })
+      .sort((a, b) => a.time.localeCompare(b.time));
+  }, [existingAppointments, form.assignedTo, form.date, form.durationMinutes, form.time, initial?.id]);
 
   async function getToken() {
     return user?.getIdToken();
@@ -226,14 +260,21 @@ export default function AppointmentModal({
   async function save() {
     if (readOnly) return;
     setError("");
-    if (!form.plate || !form.fullName || !form.phone || !form.email || !form.date || !form.time) {
-      return setError("Preencha os campos obrigatórios.");
+    if (!form.plate || !form.fullName || !form.phone || !form.email || !form.date || !form.time || !form.assignedTo) {
+      return setError("Preencha os campos obrigatórios, incluindo o responsável pela coleta.");
+    }
+    if (scheduleConflicts.length > 0) {
+      const first = scheduleConflicts[0];
+      return setError(`Conflito de agenda: ${form.assignedToName || "o responsável"} já possui uma coleta às ${first.time}. Escolha outro horário ou responsável.`);
     }
     setSaving(true);
     try {
       const cleanedPhone = cleanPhone(form.phone);
+      const selectedResponsible = operationalUsers.find((item) => item.uid === form.assignedTo);
       const payload = {
         ...form,
+        assignedToName: selectedResponsible?.name || form.assignedToName || profile?.name || "",
+        assignedDepartment: selectedResponsible?.department || "",
         plate: cleanPlate(form.plate),
         phone: cleanedPhone,
         phoneDigits: cleanedPhone,
@@ -248,7 +289,7 @@ export default function AppointmentModal({
           userEmail: profile!.email,
           action: "APPOINTMENT_UPDATED",
           targetId: initial.id,
-          details: { plate: payload.plate, fullName: payload.fullName, phone: payload.phone, status: payload.status },
+          details: { plate: payload.plate, fullName: payload.fullName, phone: payload.phone, status: payload.status, assignedToName: payload.assignedToName },
         });
       } else {
         const created = await addDoc(collection(db, "appointments"), {
@@ -263,7 +304,7 @@ export default function AppointmentModal({
           userEmail: profile!.email,
           action: "APPOINTMENT_CREATED",
           targetId: created.id,
-          details: { plate: payload.plate, fullName: payload.fullName, phone: payload.phone, status: payload.status },
+          details: { plate: payload.plate, fullName: payload.fullName, phone: payload.phone, status: payload.status, assignedToName: payload.assignedToName },
         });
       }
 
@@ -355,6 +396,16 @@ export default function AppointmentModal({
           </div>
         )}
 
+        {!readOnly && scheduleConflicts.length > 0 && (
+          <div className="schedule-conflict">
+            <strong>Conflito de horário para este responsável</strong>
+            <span>O mesmo dia pode ter várias coletas, mas um responsável não pode ficar em duas coletas ao mesmo tempo.</span>
+            {scheduleConflicts.map((item) => (
+              <span key={item.id}>{item.time} • {item.fullName} • {item.plate}</span>
+            ))}
+          </div>
+        )}
+
         <div className="grid-2">
           <div className="field">
             <label>Placa *</label>
@@ -403,6 +454,30 @@ export default function AppointmentModal({
             </button>
           </div>
         )}
+
+        <div className="field">
+          <label>Responsável pela coleta *</label>
+          <select
+            className="select"
+            disabled={readOnly}
+            value={form.assignedTo}
+            onChange={(e) => {
+              const selected = operationalUsers.find((item) => item.uid === e.target.value);
+              setForm({ ...form, assignedTo: e.target.value, assignedToName: selected?.name || "" });
+            }}
+          >
+            <option value="">Selecione o responsável</option>
+            {operationalUsers.map((item) => (
+              <option key={item.uid} value={item.uid}>
+                {item.name}{item.department ? ` • ${item.department}` : ""}
+              </option>
+            ))}
+            {form.assignedTo && !operationalUsers.some((item) => item.uid === form.assignedTo) && (
+              <option value={form.assignedTo}>{form.assignedToName || "Responsável atual"}</option>
+            )}
+          </select>
+          <small className="field-help">É permitido ter várias coletas no mesmo dia e até no mesmo horário, desde que sejam atribuídas a responsáveis diferentes.</small>
+        </div>
 
         <div className="grid-3">
           <div className="field">

@@ -37,6 +37,9 @@ export interface Appointment {
   durationMinutes: number;
   status: AppointmentStatus;
   notes?: string;
+  assignedTo?: string;
+  assignedToName?: string;
+  assignedDepartment?: string;
   createdBy: string;
   createdByName?: string;
   createdAt?: unknown;

@@ -1877,3 +1877,13 @@
   .call-history-item{grid-template-columns:28px 1fr}
   .call-history-item>.pill{grid-column:2;justify-self:start}
 }
+
+
+/* V1.39.2 — múltiplas coletas por dia e responsável */
+.field-help{display:block;margin-top:6px;color:var(--muted);font-size:9.5px;line-height:1.4}
+.schedule-conflict{display:grid;gap:5px;padding:11px 12px;border-radius:12px;border:1px solid rgba(195,59,59,.28);background:rgba(195,59,59,.08);color:var(--muted);font-size:10.5px}
+.schedule-conflict strong{color:var(--danger);font-size:11px}
+.schedule-conflict span{display:block}
+.day-appointment-count{display:inline-flex;margin-top:5px;padding:3px 6px;border-radius:999px;background:rgba(244,196,0,.11);color:#a88700;font-size:8px;font-weight:850;text-transform:none}
+.appointment-responsible{display:block;color:var(--text)!important;font-size:8.5px;font-weight:750;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.cal-cell{display:grid;align-content:start;gap:5px}

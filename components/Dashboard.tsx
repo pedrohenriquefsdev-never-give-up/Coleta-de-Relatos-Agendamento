@@ -24,7 +24,7 @@ import {
 } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 import { db } from "@/lib/firebase";
-import type { Appointment } from "@/lib/types";
+import type { AppUser, Appointment } from "@/lib/types";
 import { useSession } from "./AuthGate";
 import AppointmentModal from "./AppointmentModal";
 import Plate from "./Plate";
@@ -90,9 +90,11 @@ export default function Dashboard() {
   const { profile, logout } = useSession();
   const [tab, setTab] = useState("agenda");
   const [appointments, setAppointments] = useState<Appointment[]>([]);
+  const [users, setUsers] = useState<AppUser[]>([]);
   const [logs, setLogs] = useState<any[]>([]);
   const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState("todos");
+  const [responsibleFilter, setResponsibleFilter] = useState("todos");
   const [dateFilter, setDateFilter] = useState("");
   const [weekOffset, setWeekOffset] = useState(0);
   const [modal, setModal] = useState<{ item?: Appointment | null; date?: string; time?: string } | null>(null);
@@ -100,6 +102,12 @@ export default function Dashboard() {
   useEffect(() => {
     return onSnapshot(collection(db, "appointments"), (snapshot) => {
       setAppointments(snapshot.docs.map((docSnap) => ({ id: docSnap.id, ...docSnap.data() } as Appointment)));
+    });
+  }, []);
+
+  useEffect(() => {
+    return onSnapshot(query(collection(db, "users"), orderBy("name")), (snapshot) => {
+      setUsers(snapshot.docs.map((docSnap) => ({ uid: docSnap.id, ...docSnap.data() } as AppUser)));
     });
   }, []);
 
@@ -120,8 +128,9 @@ export default function Dashboard() {
   const filtered = appointments.filter((a) => {
     const matchesSearch = `${a.plate} ${a.fullName} ${a.phone}`.toLowerCase().includes(search.toLowerCase());
     const matchesStatus = statusFilter === "todos" || a.status === statusFilter || (statusFilter === "concluido" && a.status === "atendido");
+    const matchesResponsible = responsibleFilter === "todos" || (a.assignedTo || a.createdBy) === responsibleFilter;
     const matchesDate = !dateFilter || a.date === dateFilter;
-    return matchesSearch && matchesStatus && matchesDate;
+    return matchesSearch && matchesStatus && matchesResponsible && matchesDate;
   });
 
   const today = format(new Date(), "yyyy-MM-dd");
@@ -163,9 +172,15 @@ export default function Dashboard() {
               <option value="cancelado">Cancelado</option>
               <option value="nao_compareceu">Não compareceu</option>
             </select>
+            <select className="select table-filter" value={responsibleFilter} onChange={(e) => setResponsibleFilter(e.target.value)}>
+              <option value="todos">Todos os responsáveis</option>
+              {users.filter((u) => u.active && (u.role === "admin" || u.role === "atendente")).map((u) => (
+                <option key={u.uid} value={u.uid}>{u.name}</option>
+              ))}
+            </select>
             <input className="input table-date-filter" type="date" value={dateFilter} onChange={(e) => setDateFilter(e.target.value)} title="Filtrar por data" />
-            {(search || statusFilter !== "todos" || dateFilter) && (
-              <button className="btn" onClick={() => { setSearch(""); setStatusFilter("todos"); setDateFilter(""); }}>Limpar</button>
+            {(search || statusFilter !== "todos" || responsibleFilter !== "todos" || dateFilter) && (
+              <button className="btn" onClick={() => { setSearch(""); setStatusFilter("todos"); setResponsibleFilter("todos"); setDateFilter(""); }}>Limpar</button>
             )}
             {canEditAppointments && (
               <button className="btn primary" onClick={() => setModal({})}>
@@ -184,6 +199,7 @@ export default function Dashboard() {
                 <th>Placa</th>
                 <th>Nome</th>
                 <th>Telefone</th>
+                <th>Responsável</th>
                 <th>Status</th>
                 <th>Ações</th>
               </tr>
@@ -198,6 +214,7 @@ export default function Dashboard() {
                     <td><Plate value={a.plate} compact /></td>
                     <td><strong>{a.fullName}</strong></td>
                     <td>{a.phone}</td>
+                    <td>{a.assignedToName || a.createdByName || "—"}</td>
                     <td><span className={`pill status-${a.status}`}>{appointmentStatusLabels[a.status] || a.status.replaceAll("_", " ")}</span></td>
                     <td>
                       <div className="row-actions">
@@ -214,7 +231,7 @@ export default function Dashboard() {
                   </tr>
                 ))}
               {filtered.length === 0 && (
-                <tr><td colSpan={7}><div className="empty compact-empty">Nenhum agendamento encontrado com os filtros selecionados.</div></td></tr>
+                <tr><td colSpan={8}><div className="empty compact-empty">Nenhum agendamento encontrado com os filtros selecionados.</div></td></tr>
               )}
             </tbody>
           </table>
@@ -343,12 +360,17 @@ export default function Dashboard() {
             <div className="calendar">
               <div className="cal-header">
                 <div>Horário</div>
-                {days.map((d) => (
-                  <div key={d.toISOString()}>
-                    {format(d, "EEE", { locale: ptBR })}
-                    <strong>{format(d, "dd/MM")}</strong>
-                  </div>
-                ))}
+                {days.map((d) => {
+                  const date = format(d, "yyyy-MM-dd");
+                  const dayCount = appointments.filter((a) => a.date === date && a.status !== "cancelado").length;
+                  return (
+                    <div key={d.toISOString()}>
+                      {format(d, "EEE", { locale: ptBR })}
+                      <strong>{format(d, "dd/MM")}</strong>
+                      <span className="day-appointment-count">{dayCount === 1 ? "1 coleta" : `${dayCount} coletas`}</span>
+                    </div>
+                  );
+                })}
               </div>
 
               {hours.map((h) => (
@@ -356,7 +378,9 @@ export default function Dashboard() {
                   <div className="cal-time">{h}</div>
                   {days.map((d) => {
                     const date = format(d, "yyyy-MM-dd");
-                    const items = appointments.filter((a) => a.date === date && a.time === h);
+                    const items = appointments
+                      .filter((a) => a.date === date && a.time === h)
+                      .sort((a, b) => (a.assignedToName || a.createdByName || "").localeCompare(b.assignedToName || b.createdByName || ""));
                     return (
                       <div className="cal-cell" key={date + h} onDoubleClick={() => canEditAppointments && setModal({ date, time: h })}>
                         {items.map((a) => (
@@ -364,6 +388,7 @@ export default function Dashboard() {
                             <div className="appointment-time">{a.time}</div>
                             <Plate value={a.plate} compact />
                             <span>{a.fullName}</span>
+                            <small className="appointment-responsible">{a.assignedToName || a.createdByName || "Sem responsável"}</small>
                           </div>
                         ))}
                       </div>
@@ -443,7 +468,7 @@ export default function Dashboard() {
         {renderBody()}
       </main>
 
-      {modal && <AppointmentModal initial={modal.item} defaultDate={modal.date} defaultTime={modal.time} existingAppointments={appointments} readOnly={!canEditAppointments} onClose={() => setModal(null)} onSaved={() => {}} />}
+      {modal && <AppointmentModal initial={modal.item} defaultDate={modal.date} defaultTime={modal.time} existingAppointments={appointments} availableUsers={users} readOnly={!canEditAppointments} onClose={() => setModal(null)} onSaved={() => {}} />}
     </div>
   );
 }

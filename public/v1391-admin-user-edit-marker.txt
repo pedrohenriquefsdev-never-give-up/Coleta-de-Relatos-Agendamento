@@ -1,0 +1,1 @@
+V1.39.1 - administrador pode editar nome, e-mail, perfil, departamento, senha/CPF opcional e VTCall de outros usuários.

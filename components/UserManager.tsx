@@ -33,6 +33,7 @@ export default function UserManager() {
   const [otherDepartment, setOtherDepartment] = useState("");
   const [form, setForm] = useState({ name: "", email: "", cpf: "", role: "atendente" as UserRole, department: "Atendimento" });
   const [vtcall, setVtcall] = useState(DEFAULT_VTCALL);
+  const [editCpf, setEditCpf] = useState("");
 
   useEffect(() => onSnapshot(query(collection(db, "users"), orderBy("name")), (s) => setUsers(s.docs.map((d) => ({ uid: d.id, ...d.data() } as AppUser)))), []);
 
@@ -89,6 +90,7 @@ export default function UserManager() {
     setEditing({ ...u, department: u.department || "Atendimento" });
     setOtherDepartment("");
     setVtcall(DEFAULT_VTCALL);
+    setEditCpf("");
     setLoadingVT(true);
     try {
       const res = await fetch(`/api/admin/users/${u.uid}/vtcall`, { headers: { Authorization: `Bearer ${await token()}` } });
@@ -99,16 +101,23 @@ export default function UserManager() {
 
   async function saveEditing() {
     if (!editing) return;
+    const name = String(editing.name || "").trim();
+    const email = String(editing.email || "").trim().toLowerCase();
     const department = editing.department === "__outro__" ? otherDepartment.trim() : (editing.department || "").trim();
-    if (!department) return setError("Informe o departamento.");
+    const cpf = editCpf.replace(/\D/g, "");
+    if (!name || !email || !department) return setError("Preencha nome, e-mail e departamento.");
+    if (!email.includes("@")) return setError("Informe um e-mail válido.");
+    if (cpf && cpf.length !== 11) return setError("O novo CPF precisa ter 11 dígitos.");
     const wantsVTCall = Boolean(vtcall.extension || vtcall.password || editing.vtcallConfigured);
     if (wantsVTCall && (!vtcall.extension || !vtcall.password)) return setError("Preencha o ramal e a senha do VTCall.");
     setLoading(true); setError("");
     try {
+      const payload: Record<string, unknown> = { name, email, role: editing.role, department };
+      if (cpf) payload.cpf = cpf;
       const res = await fetch(`/api/admin/users/${editing.uid}`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json", Authorization: `Bearer ${await token()}` },
-        body: JSON.stringify({ department }),
+        body: JSON.stringify(payload),
       });
       const data = await readJsonSafe(res);
       if (!res.ok) throw new Error(`Perfil: ${data.error || `falha HTTP ${res.status}`}${data.technical ? ` — ${data.technical}` : ""}`);
@@ -119,7 +128,7 @@ export default function UserManager() {
           throw new Error(`VTCall: ${vtError instanceof Error ? vtError.message : "não foi possível salvar a configuração."}`);
         }
       }
-      setEditing(null); setOtherDepartment(""); setVtcall(DEFAULT_VTCALL);
+      setEditing(null); setOtherDepartment(""); setVtcall(DEFAULT_VTCALL); setEditCpf("");
     } catch (e) { setError(e instanceof Error ? e.message : "Erro"); }
     finally { setLoading(false); }
   }
@@ -211,10 +220,17 @@ export default function UserManager() {
       </div>
     </Modal>}
 
-    {editing&&<Modal title={`Usuário • ${editing.name}`} onClose={()=>setEditing(null)} footer={<><button className="btn" onClick={()=>setEditing(null)}>Cancelar</button><button className="btn primary" onClick={saveEditing} disabled={loading||loadingVT}>{loading?"Salvando...":"Salvar alterações"}</button></>}>
+    {editing&&<Modal title={`Editar usuário • ${editing.name}`} onClose={()=>{setEditing(null);setEditCpf("")}} footer={<><button className="btn" onClick={()=>{setEditing(null);setEditCpf("")}}>Cancelar</button><button className="btn primary" onClick={saveEditing} disabled={loading||loadingVT}>{loading?"Salvando...":"Salvar alterações"}</button></>}>
       <div className="stack">{error&&<div className="error">{error}</div>}{loadingVT&&<div className="info-note"><KeyRound size={16}/><span>Carregando configuração segura do VTCall...</span></div>}
-        <div className="field"><label>Departamento</label><select className="select" value={DEPARTMENTS.includes(editing.department||"")?editing.department:"__outro__"} onChange={(e)=>{if(e.target.value==="__outro__"){setOtherDepartment(DEPARTMENTS.includes(editing.department||"")?"":(editing.department||""));setEditing({...editing,department:"__outro__"})}else{setOtherDepartment("");setEditing({...editing,department:e.target.value})}}}>{DEPARTMENTS.map((d)=><option key={d}>{d}</option>)}<option value="__outro__">Outro</option></select></div>
+        <div className="field"><label>Nome completo</label><input className="input" value={editing.name||""} onChange={(e)=>setEditing({...editing,name:e.target.value})}/></div>
+        <div className="field"><label>E-mail de acesso</label><input className="input" type="email" value={editing.email||""} onChange={(e)=>setEditing({...editing,email:e.target.value})}/><small style={{color:"#777"}}>Ao alterar o e-mail, o novo endereço passa a ser usado no próximo login.</small></div>
+        <div className="field"><label>Novo CPF / redefinir senha</label><input className="input" inputMode="numeric" value={editCpf} onChange={(e)=>setEditCpf(e.target.value.replace(/\D/g,"").slice(0,11))} placeholder="Deixe em branco para manter a senha atual"/><small style={{color:"#777"}}>Preencha apenas se quiser redefinir a senha de acesso para um novo CPF. O CPF não é salvo em texto puro.</small></div>
+        <div className="grid-2">
+          <div className="field"><label>Departamento</label><select className="select" value={DEPARTMENTS.includes(editing.department||"")?editing.department:"__outro__"} onChange={(e)=>{if(e.target.value==="__outro__"){setOtherDepartment(DEPARTMENTS.includes(editing.department||"")?"":(editing.department||""));setEditing({...editing,department:"__outro__"})}else{setOtherDepartment("");setEditing({...editing,department:e.target.value})}}}>{DEPARTMENTS.map((d)=><option key={d}>{d}</option>)}<option value="__outro__">Outro</option></select></div>
+          <div className="field"><label>Perfil de acesso</label><select className="select" value={editing.role} disabled={editing.uid===auth.currentUser?.uid} onChange={(e)=>setEditing({...editing,role:e.target.value as UserRole})}><option value="admin">Administrador</option><option value="atendente">Atendente</option><option value="consulta">Consulta</option></select></div>
+        </div>
         {editing.department==="__outro__"&&<div className="field"><label>Nome do departamento</label><input className="input" value={otherDepartment} onChange={(e)=>setOtherDepartment(e.target.value)}/></div>}
+        {editing.uid===auth.currentUser?.uid&&<div className="info-note"><KeyRound size={16}/><span>Por segurança, você não pode remover seu próprio perfil de administrador por esta tela.</span></div>}
         <VtFields/>
       </div>
     </Modal>}

@@ -72,3 +72,10 @@ Depois de alterar Environment Variables, faça um novo deploy.
 - Alerta não bloqueante de possível duplicidade por placa/telefone em datas próximas.
 - Atalho VTCall do painel atualizado para refletir integração ativa.
 - Instrumentação de investigação da V1.38 mantida somente no backend, sem alerta específico no modal.
+
+
+## V1.39.2
+- Múltiplas coletas no mesmo dia.
+- Responsável por agendamento.
+- Conflito apenas quando o mesmo responsável tem horários sobrepostos.
+- Contagem diária na agenda e filtro por responsável.
