@@ -1,4 +1,4 @@
-# Portal Coleta de Relatos — V1.39.3
+# Portal Coleta de Relatos — V1.39.4
 
 Portal interno para agenda, gestão de acessos, auditoria e futura integração com VTCall.
 
@@ -89,3 +89,11 @@ Depois de alterar Environment Variables, faça um novo deploy.
 - O Desenvolvedor pode substituir a foto de perfil de qualquer usuário diretamente pela tela de edição.
 - Alterações de foto feitas pelo Desenvolvedor são registradas na auditoria.
 - Regras do Firestore reforçadas para proteger o cadastro técnico também contra alterações diretas pelo cliente.
+
+
+## V1.39.4 — Novo ícone da aplicação
+- Novo símbolo oficial do Portal Coleta de Relatos em preto e amarelo.
+- Ícone atualizado no login e na navegação interna.
+- Favicon/ícone da aba do navegador atualizado.
+- Apple touch icon atualizado para atalhos em dispositivos compatíveis.
+- Nenhuma regra de acesso, agenda, VTCall ou Firebase foi alterada nesta versão.
