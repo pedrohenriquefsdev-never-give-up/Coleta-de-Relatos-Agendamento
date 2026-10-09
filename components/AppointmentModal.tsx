@@ -37,6 +37,7 @@ export default function AppointmentModal({
   const [deleting, setDeleting] = useState(false);
   const [calling, setCalling] = useState(false);
   const [callMessage, setCallMessage] = useState("");
+  const [callWarning, setCallWarning] = useState("");
   const [error, setError] = useState("");
   const [form, setForm] = useState({
     plate: initial?.plate || "",
@@ -57,7 +58,7 @@ export default function AppointmentModal({
     const phone = cleanPhone(form.phone);
     if (!phone) return setError("Informe um telefone válido antes de iniciar a ligação.");
     if (!initial) return setError("Salve o agendamento antes de iniciar uma ligação.");
-    setError(""); setCallMessage(""); setCalling(true);
+    setError(""); setCallMessage(""); setCallWarning(""); setCalling(true);
     try {
       const token = await user?.getIdToken();
       const res = await fetch("/api/vtcall/call", {
@@ -74,6 +75,9 @@ export default function AppointmentModal({
         throw new Error(`${data.error || "Não foi possível iniciar a ligação."}${detail}${showpeer}`);
       }
       setCallMessage(data.message || "Ligação solicitada. Aguarde o seu ramal tocar.");
+      if (data.showpeer?.before?.active) {
+        setCallWarning(`O Showpeer encontrou ${data.showpeer.before.count} chamada(s) ativa(s) no seu ramal antes do Click to Call. Isso pode explicar áudio/sessão anterior antes do Answer.`);
+      }
     } catch (e) {
       setError(e instanceof Error ? e.message : "Não foi possível iniciar a ligação.");
     } finally { setCalling(false); }
@@ -247,6 +251,7 @@ export default function AppointmentModal({
           <textarea className="textarea" value={form.notes} onChange={(e) => setForm({ ...form, notes: e.target.value })} placeholder="Informações adicionais..." />
         </div>
 
+        {callWarning && <div className="warning">{callWarning}</div>}
         {callMessage && <div className="success">{callMessage}</div>}
         {initial?.call?.callId && (
           <div className="success">Ligação VTCall vinculada: <strong>{initial.call.callId}</strong></div>

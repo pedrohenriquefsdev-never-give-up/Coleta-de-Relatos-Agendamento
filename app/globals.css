@@ -1759,3 +1759,14 @@
 .diag-row.ok strong{color:#45c486}
 .diag-row.bad strong{color:#ff5b5b}
 .diag-code{font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-size:11px;color:var(--muted);padding:10px 12px;border-radius:10px;background:#121310;border:1px solid var(--line)}
+
+
+.warning{
+  border:1px solid rgba(255,196,0,.28);
+  background:rgba(255,196,0,.08);
+  color:#f1d05a;
+  border-radius:12px;
+  padding:10px 12px;
+  font-size:12px;
+  line-height:1.45;
+}

@@ -8,7 +8,51 @@ import { safeServerError } from "@/lib/server-error";
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
+
 const cleanPhone = (v: string) => String(v || "").replace(/\D/g, "");
+
+async function readShowpeer(extension: string, token: string) {
+  const base = vtEnv("VTCALL_SHOWPEER_URL", "https://api23.vtcall.app/API/showpeer");
+  try {
+    const url = new URL(base);
+    url.searchParams.set("ramal", extension);
+
+    const response = await fetch(url.toString(), {
+      method: "GET",
+      headers: {
+        access_token: token,
+        "access-token": token,
+      },
+      cache: "no-store",
+      redirect: "follow",
+    });
+
+    const raw = await response.text();
+    let data: any = null;
+    try { data = raw ? JSON.parse(raw) : null; } catch { data = raw || null; }
+
+    const calls = Array.isArray(data) ? data : [];
+    return {
+      ok: response.ok,
+      status: response.status,
+      url: response.url || url.toString(),
+      active: response.ok && calls.length > 0,
+      count: response.ok ? calls.length : 0,
+      calls: response.ok ? calls.slice(0, 10) : [],
+      providerMessage: !response.ok ? String(raw || "").slice(0, 250) : null,
+    };
+  } catch (e: any) {
+    return {
+      ok: false,
+      status: null,
+      url: base,
+      active: false,
+      count: 0,
+      calls: [],
+      providerMessage: String(e?.message || e).slice(0, 250),
+    };
+  }
+}
 
 export async function POST(req: NextRequest) {
   try {
@@ -27,6 +71,11 @@ export async function POST(req: NextRequest) {
     if (!token) return Response.json({ error: "Token do Click to Call VTCall ainda não configurado no servidor." }, { status: 503 });
 
     const extension = String(cred.data()?.extension);
+
+    // Captura o estado real do ramal imediatamente ANTES do Click to Call.
+    // Isso ajuda a identificar se já existia uma chamada/sessão ativa no PABX.
+    const showpeerBefore = await readShowpeer(extension, token);
+
     const vtResponse = await fetch(apiUrl, {
       method: "POST",
       headers: {
@@ -120,6 +169,9 @@ export async function POST(req: NextRequest) {
       }, { status: 502 });
     }
 
+    // Nova leitura logo após o provedor aceitar o Click to Call.
+    const showpeerAfter = await readShowpeer(extension, token);
+
     const attempt = await adminDb().collection("callAttempts").add({
       appointmentId: appointmentId || null,
       userId: user.uid,
@@ -130,6 +182,9 @@ export async function POST(req: NextRequest) {
       status: "requested",
       requestedAt: FieldValue.serverTimestamp(),
       providerResponse: vtBody?.message || "Ok",
+      showpeerBefore,
+      showpeerAfter,
+      preExistingCall: Boolean(showpeerBefore?.active),
     });
 
     if (appointmentId) {
@@ -141,6 +196,19 @@ export async function POST(req: NextRequest) {
           requestedAt: FieldValue.serverTimestamp(),
           extension,
           phone,
+          preExistingCall: Boolean(showpeerBefore?.active),
+          showpeerBefore: {
+            ok: Boolean(showpeerBefore?.ok),
+            status: showpeerBefore?.status ?? null,
+            active: Boolean(showpeerBefore?.active),
+            count: Number(showpeerBefore?.count || 0),
+          },
+          showpeerAfter: {
+            ok: Boolean(showpeerAfter?.ok),
+            status: showpeerAfter?.status ?? null,
+            active: Boolean(showpeerAfter?.active),
+            count: Number(showpeerAfter?.count || 0),
+          },
         },
         updatedAt: FieldValue.serverTimestamp(),
       }, { merge: true });
@@ -152,11 +220,38 @@ export async function POST(req: NextRequest) {
       userEmail: user.email,
       action: "VTCALL_CALL_REQUESTED",
       targetId: appointmentId || attempt.id,
-      details: { phone, extension, attemptId: attempt.id },
+      details: {
+        phone,
+        extension,
+        attemptId: attempt.id,
+        preExistingCall: Boolean(showpeerBefore?.active),
+        showpeerBeforeCount: Number(showpeerBefore?.count || 0),
+        showpeerAfterCount: Number(showpeerAfter?.count || 0),
+      },
       createdAt: FieldValue.serverTimestamp(),
     });
 
-    return Response.json({ ok: true, message: "Ligação solicitada. Aguarde o seu ramal tocar.", attemptId: attempt.id });
+    return Response.json({
+      ok: true,
+      message: showpeerBefore?.active
+        ? "Ligação solicitada. Atenção: o ramal já aparecia em chamada no Showpeer antes do disparo."
+        : "Ligação solicitada. Aguarde o seu ramal tocar.",
+      attemptId: attempt.id,
+      showpeer: {
+        before: {
+          ok: Boolean(showpeerBefore?.ok),
+          status: showpeerBefore?.status ?? null,
+          active: Boolean(showpeerBefore?.active),
+          count: Number(showpeerBefore?.count || 0),
+        },
+        after: {
+          ok: Boolean(showpeerAfter?.ok),
+          status: showpeerAfter?.status ?? null,
+          active: Boolean(showpeerAfter?.active),
+          count: Number(showpeerAfter?.count || 0),
+        },
+      },
+    });
   } catch (e: any) {
     const status = e?.message === "UNAUTHORIZED" ? 401 : e?.message === "FORBIDDEN" ? 403 : 500;
     const technical = safeServerError(e);
