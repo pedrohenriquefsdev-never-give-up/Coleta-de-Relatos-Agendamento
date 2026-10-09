@@ -1,0 +1,2 @@
+Portal Coleta de Relatos - V1.37
+Uses only VTCALL_ACCESS_TOKEN and sends access_token + access-token headers.

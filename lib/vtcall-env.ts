@@ -24,7 +24,7 @@ export function vtTokenMeta(rawName = "VTCALL_ACCESS_TOKEN") {
     present: Boolean(normalized),
     length: normalized.length,
     hadOuterQuotes:
-      raw.length >= 2 &&
+      raw.trim().length >= 2 &&
       ((raw.trim().startsWith('"') && raw.trim().endsWith('"')) ||
         (raw.trim().startsWith("'") && raw.trim().endsWith("'"))),
     hadOuterWhitespace: raw !== raw.trim(),

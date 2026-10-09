@@ -21,11 +21,9 @@ export async function POST(req: NextRequest) {
     const cred = await adminDb().collection("vtcallCredentials").doc(user.uid).get();
     if (!cred.exists || !cred.data()?.extension) return Response.json({ error: "Seu ramal VTCall ainda não foi configurado." }, { status: 409 });
 
-    const clickToken = vtEnv("VTCALL_CLICK_TO_CALL_TOKEN");
-    const accessToken = vtEnv("VTCALL_ACCESS_TOKEN");
-    const token = clickToken || accessToken;
-    const tokenSource = clickToken ? "VTCALL_CLICK_TO_CALL_TOKEN" : "VTCALL_ACCESS_TOKEN";
-    const apiUrl = vtEnv("VTCALL_CLICK_TO_CALL_URL", "http://www23.vtcall.app/API/clicktocall");
+    const token = vtEnv("VTCALL_ACCESS_TOKEN");
+    const tokenSource = "VTCALL_ACCESS_TOKEN";
+    const apiUrl = vtEnv("VTCALL_CLICK_TO_CALL_URL", "https://api23.vtcall.app/API/clicktocall");
     if (!token) return Response.json({ error: "Token do Click to Call VTCall ainda não configurado no servidor." }, { status: 503 });
 
     const extension = String(cred.data()?.extension);
@@ -34,6 +32,7 @@ export async function POST(req: NextRequest) {
       headers: {
         "Content-Type": "application/json",
         "access_token": token,
+        "access-token": token,
       },
       body: JSON.stringify({ type: "ramal", first: extension, last: phone }),
       cache: "no-store",
@@ -64,7 +63,10 @@ export async function POST(req: NextRequest) {
 
             const check = await fetch(url.toString(), {
               method: "GET",
-              headers: { access_token: token },
+              headers: {
+                access_token: token,
+                "access-token": token,
+              },
               cache: "no-store",
               redirect: "follow",
             });
