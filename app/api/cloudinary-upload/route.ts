@@ -1,3 +1,4 @@
+import { runtimeEnv } from "@/lib/runtime-env";
 import { createHash } from "node:crypto";
 import { NextRequest } from "next/server";
 import { adminAuth, adminDb } from "@/lib/firebase-admin";
@@ -13,10 +14,15 @@ export async function POST(req: NextRequest) {
     const user = await adminDb().collection("users").doc(decoded.uid).get();
     if (!user.exists || user.data()?.active === false) return Response.json({ error: "Acesso bloqueado" }, { status: 403 });
 
-    const cloudName = process.env.CLOUDINARY_CLOUD_NAME;
-    const apiKey = process.env.CLOUDINARY_API_KEY;
-    const apiSecret = process.env.CLOUDINARY_API_SECRET;
+    const cloudName = runtimeEnv("CLOUDINARY_CLOUD_NAME").trim();
+    const apiKey = runtimeEnv("CLOUDINARY_API_KEY").trim();
+    const apiSecret = runtimeEnv("CLOUDINARY_API_SECRET").trim();
     if (!cloudName || !apiKey || !apiSecret) return Response.json({ error: "Cloudinary não configurado" }, { status: 500 });
+    if (cloudName.toLowerCase() === "root" || /[\/\s]/.test(cloudName) || cloudName.includes("cloudinary.com")) {
+      return Response.json({
+        error: `CLOUDINARY_CLOUD_NAME está incorreto (${cloudName}). Use o Cloud name da sua conta Cloudinary, não o nome de uma pasta como Root.`,
+      }, { status: 503 });
+    }
 
     const data = await req.formData();
     const file = data.get("file");
@@ -43,7 +49,20 @@ export async function POST(req: NextRequest) {
     const payload = await response.json();
     if (!response.ok || !payload.secure_url) return Response.json({ error: payload.error?.message || "Falha no upload" }, { status: 500 });
 
-    return Response.json({ url: payload.secure_url });
+    await adminDb().collection("users").doc(decoded.uid).set({
+      photoUrl: payload.secure_url,
+      updatedAt: new Date(),
+    }, { merge: true });
+
+    adminDb().collection("auditLogs").add({
+      userId: decoded.uid,
+      userName: user.data()?.name || user.data()?.email || "Usuário",
+      userEmail: user.data()?.email || "",
+      action: "PROFILE_PHOTO_UPDATED",
+      createdAt: new Date(),
+    }).catch(() => undefined);
+
+    return Response.json({ ok: true, url: payload.secure_url });
   } catch (e: any) {
     const message = String(e?.message || "");
     const error =
@@ -52,6 +71,10 @@ export async function POST(req: NextRequest) {
         : message.includes("PRIVATE_KEY") || message.includes("private key") || message.includes("DECODER routines")
           ? "A chave privada do Firebase Admin está inválida ou foi colada com formatação incorreta na Vercel."
           : "Não foi possível enviar a imagem.";
-    return Response.json({ error, code: e?.code || undefined }, { status: 500 });
+    return Response.json({
+      error,
+      code: e?.code || undefined,
+      technical: String(e?.message || "").slice(0, 400),
+    }, { status: 500 });
   }
 }

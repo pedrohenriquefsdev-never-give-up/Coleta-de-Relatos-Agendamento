@@ -47,7 +47,7 @@ export default function UserManager() {
       body: JSON.stringify(config),
     });
     const data = await readJsonSafe(res);
-    if (!res.ok) throw new Error(data.error || `Não foi possível salvar o VTCall (HTTP ${res.status}).`);
+    if (!res.ok) throw new Error(`${data.error || `Não foi possível salvar o VTCall (HTTP ${res.status}).`}${data.technical ? ` — ${data.technical}` : ""}`);
   }
 
   async function create() {
@@ -111,7 +111,7 @@ export default function UserManager() {
         body: JSON.stringify({ department }),
       });
       const data = await readJsonSafe(res);
-      if (!res.ok) throw new Error(`Perfil: ${data.error || `falha HTTP ${res.status}`}. Verifique as variáveis FIREBASE_ADMIN_* na Vercel.`);
+      if (!res.ok) throw new Error(`Perfil: ${data.error || `falha HTTP ${res.status}`}${data.technical ? ` — ${data.technical}` : ""}`);
       if (wantsVTCall) {
         try {
           await saveVTCallFor(editing.uid);
@@ -130,7 +130,7 @@ export default function UserManager() {
     setDiagLoading(true);
     setDiag(null);
     try {
-      const res = await fetch("/api/diagnostics/firebase-admin", {
+      const res = await fetch(`/api/diagnostics/runtime-v131?t=${Date.now()}`, {
         headers: { Authorization: `Bearer ${await token()}` },
         cache: "no-store",
       });
@@ -180,23 +180,21 @@ export default function UserManager() {
       <div className="stack">
         {diagLoading&&<div className="info-note"><ServerCog size={16}/><span>Testando Firebase Admin no servidor...</span></div>}
         {!diagLoading&&diag&&<div className="diagnostic-grid">
-          <div className={`diag-row ${diag.ok?"ok":"bad"}`}><span>Configuração Firebase Admin</span><strong>{diag.ok?"OK":"FALHA"}</strong></div>
-          <div className={`diag-row ${diag.projectIdPresent?"ok":"bad"}`}><span>Project ID no ambiente</span><strong>{diag.projectIdPresent?diag.projectId:"Ausente"}</strong></div>
-          <div className={`diag-row ${diag.clientEmailPresent?"ok":"bad"}`}><span>Client e-mail no ambiente</span><strong>{diag.clientEmailPresent?`Presente (${diag.clientEmailLength} chars)`:"Ausente"}</strong></div>
-          <div className={`diag-row ${diag.privateKeyPresent?"ok":"bad"}`}><span>Private key no ambiente</span><strong>{diag.privateKeyPresent?`Presente (${diag.privateKeyLength} chars)`:"Ausente"}</strong></div>
-          <div className={`diag-row ${diag.privateKeyHasBegin&&diag.privateKeyHasEnd?"ok":"bad"}`}><span>Marcadores BEGIN/END</span><strong>{diag.privateKeyHasBegin&&diag.privateKeyHasEnd?"Encontrados":"Não encontrados"}</strong></div>
-          <div className={`diag-row ${diag.serviceAccountPresent?"ok":""}`}><span>JSON completo alternativo</span><strong>{diag.serviceAccountPresent?`Presente (${diag.serviceAccountLength} chars)`:"Não usado"}</strong></div>
-          <div className={`diag-row ${diag.serverEnvTestPresent?"ok":"bad"}`}><span>SERVER_ENV_TEST (Config)</span><strong>{diag.serverEnvTestPresent?diag.serverEnvTestValue:"Ausente"}</strong></div>
-          <div className={`diag-row ${diag.cloudinaryCloudNamePresent&&diag.cloudinaryApiKeyPresent&&diag.cloudinaryApiSecretPresent?"ok":"bad"}`}><span>Cloudinary no backend</span><strong>{diag.cloudinaryCloudNamePresent&&diag.cloudinaryApiKeyPresent&&diag.cloudinaryApiSecretPresent?"Presente":"Incompleto/Ausente"}</strong></div>
-          <div className={`diag-row ${diag.vtcallEncryptionKeyPresent&&diag.vtcallAccessTokenPresent?"ok":"bad"}`}><span>VTCall no backend</span><strong>{diag.vtcallEncryptionKeyPresent&&diag.vtcallAccessTokenPresent?"Presente":"Incompleto/Ausente"}</strong></div>
-          <div className={`diag-row ${diag.normalizedPrivateKeyLooksValid?"ok":"bad"}`}><span>Private key após normalização</span><strong>{diag.normalizedPrivateKeyLooksValid?"Reconhecida":"Inválida"}</strong></div>
-          <div className={`diag-row ${diag.sdkInitialized?"ok":"bad"}`}><span>Firebase Admin SDK</span><strong>{diag.sdkInitialized?"Inicializado":"FALHA"}</strong></div>
-          <div className={`diag-row ${diag.tokenVerified?"ok":"bad"}`}><span>Validação do token</span><strong>{diag.tokenVerified?"OK":"FALHA"}</strong></div>
-          <div className={`diag-row ${diag.userDocumentExists?"ok":"bad"}`}><span>Documento do usuário</span><strong>{diag.userDocumentExists?"Encontrado":"Não encontrado"}</strong></div>
-          <div className="diag-row"><span>Fonte</span><strong>{diag.source||"—"}</strong></div>
+          <div className={`diag-row ${diag.version==="v1.33-known-route"?"ok":"bad"}`}><span>Versão da rota</span><strong>{diag.version||"Não identificada"}</strong></div>
           <div className="diag-row"><span>HTTP</span><strong>{diag.httpStatus??"—"}</strong></div>
-          {diag.code&&<div className="diag-code">Código: {String(diag.code)}</div>}
-          {diag.error&&<div className="error">{String(diag.error)}</div>}
+          <div className={`diag-row ${diag.processEnvCount>0?"ok":"bad"}`}><span>Total de envs no runtime</span><strong>{diag.processEnvCount??"—"}</strong></div>
+          <div className={`diag-row ${diag.vercelEnv?"ok":"bad"}`}><span>VERCEL_ENV</span><strong>{diag.vercelEnv||"Ausente"}</strong></div>
+          <div className={`diag-row ${diag.serverEnvTest?"ok":"bad"}`}><span>SERVER_ENV_TEST</span><strong>{diag.serverEnvTest||"Ausente"}</strong></div>
+          <div className={`diag-row ${diag.env?.firebaseProject&&diag.env?.firebaseEmail&&diag.env?.firebaseKey?"ok":"bad"}`}><span>Credenciais Firebase</span><strong>{diag.env?.firebaseProject&&diag.env?.firebaseEmail&&diag.env?.firebaseKey?"Presentes":"Incompletas"}</strong></div>
+          <div className={`diag-row ${diag.firebaseAdminInit?"ok":"bad"}`}><span>Firebase Admin SDK</span><strong>{diag.firebaseAdminInit?"Inicializou":"FALHA"}</strong></div>
+          <div className={`diag-row ${diag.tokenVerified?"ok":"bad"}`}><span>Validar login</span><strong>{diag.tokenVerified?"OK":"FALHA"}</strong></div>
+          <div className={`diag-row ${diag.firestoreRead?"ok":"bad"}`}><span>Ler Firestore</span><strong>{diag.firestoreRead?"OK":"FALHA"}</strong></div>
+          <div className={`diag-row ${diag.userDocumentExists?"ok":"bad"}`}><span>Documento do usuário</span><strong>{diag.userDocumentExists?"Encontrado":"Não encontrado"}</strong></div>
+          <div className={`diag-row ${diag.firestoreWrite?"ok":"bad"}`}><span>Gravar Firestore</span><strong>{diag.firestoreWrite?"OK":"FALHA"}</strong></div>
+          <div className={`diag-row ${diag.env?.cloudinary?"ok":"bad"}`}><span>Cloudinary</span><strong>{diag.env?.cloudinary?"Configurado":"Incompleto"}</strong></div>
+          <div className={`diag-row ${diag.env?.vtcall?"ok":"bad"}`}><span>VTCall</span><strong>{diag.env?.vtcall?"Configurado":"Incompleto"}</strong></div>
+          {diag.error&&<div className="error">{typeof diag.error==="string"?diag.error:`${diag.error.code?diag.error.code+" — ":""}${diag.error.message||JSON.stringify(diag.error)}`}</div>}
+          {diag.raw&&<div className="diag-code">Resposta bruta: {String(diag.raw)}</div>}
         </div>}
       </div>
     </Modal>}

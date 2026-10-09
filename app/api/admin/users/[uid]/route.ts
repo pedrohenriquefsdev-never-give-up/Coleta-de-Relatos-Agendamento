@@ -2,6 +2,7 @@ import { NextRequest } from "next/server";
 import { FieldValue } from "firebase-admin/firestore";
 import { adminAuth, adminDb } from "@/lib/firebase-admin";
 import { requireAdmin } from "@/lib/server-auth";
+import { safeServerError as technicalError } from "@/lib/server-error";
 
 export const runtime = "nodejs";
 function safeServerError(e: any) {
@@ -73,9 +74,11 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ ui
       e?.message === "FORBIDDEN" ? 403 :
       500;
 
+    const technical = technicalError(e);
     return Response.json({
       error: status === 500 ? safeServerError(e) : "Você não tem permissão para realizar esta alteração.",
-      code: e?.code || undefined,
+      code: technical.code,
+      technical: status === 500 ? technical.message : undefined,
     }, { status });
   }
 }

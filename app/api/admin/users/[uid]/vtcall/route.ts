@@ -3,6 +3,7 @@ import { FieldValue } from "firebase-admin/firestore";
 import { adminDb } from "@/lib/firebase-admin";
 import { encryptSecret, decryptSecret } from "@/lib/vtcall-crypto";
 import { requireAdmin } from "@/lib/server-auth";
+import { safeServerError } from "@/lib/server-error";
 
 export const runtime = "nodejs";
 function clean(body: any) {
@@ -83,6 +84,11 @@ export async function PUT(req: NextRequest, { params }: { params: Promise<{ uid:
           : String(e?.message || "").includes("Firebase Admin não configurado")
             ? "Firebase Admin não está configurado corretamente na Vercel."
             : "Não foi possível salvar a configuração.";
-    return Response.json({ error: message }, { status });
+    const technical = safeServerError(e);
+    return Response.json({
+      error: message,
+      code: technical.code,
+      technical: status === 500 ? technical.message : undefined,
+    }, { status });
   }
 }

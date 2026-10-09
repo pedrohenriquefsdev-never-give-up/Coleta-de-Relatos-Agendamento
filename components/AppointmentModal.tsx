@@ -65,8 +65,14 @@ export default function AppointmentModal({
         headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
         body: JSON.stringify({ phone, appointmentId: initial.id }),
       });
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.error || "Não foi possível iniciar a ligação.");
+      const raw = await res.text();
+      let data: any = {};
+      try { data = raw ? JSON.parse(raw) : {}; } catch { data = { error: raw || `HTTP ${res.status}` }; }
+      if (!res.ok) {
+        const detail = data.providerMessage && data.providerMessage !== data.error ? ` — ${data.providerMessage}` : "";
+        const showpeer = data.showpeerDiagnostic?.status ? ` [Showpeer HTTP ${data.showpeerDiagnostic.status}]` : "";
+        throw new Error(`${data.error || "Não foi possível iniciar a ligação."}${detail}${showpeer}`);
+      }
       setCallMessage(data.message || "Ligação solicitada. Aguarde o seu ramal tocar.");
     } catch (e) {
       setError(e instanceof Error ? e.message : "Não foi possível iniciar a ligação.");

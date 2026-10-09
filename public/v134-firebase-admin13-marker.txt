@@ -1,0 +1,2 @@
+Portal Coleta de Relatos - V1.34
+firebase-admin pinned to 13.10.0 to avoid jwks-rsa@4 + jose@6 ERR_REQUIRE_ESM on Vercel.

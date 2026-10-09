@@ -1,0 +1,1 @@
+Portal Coleta de Relatos v1.35 - Cloudinary cloud name validation and VTCall Click-to-Call provider diagnostics

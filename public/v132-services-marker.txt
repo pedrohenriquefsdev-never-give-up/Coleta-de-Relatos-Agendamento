@@ -1,0 +1,1 @@
+Portal Coleta de Relatos - V1.32 service diagnostics and server-side persistence

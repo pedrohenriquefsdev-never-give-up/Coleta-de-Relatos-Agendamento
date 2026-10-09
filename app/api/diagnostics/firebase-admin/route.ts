@@ -1,3 +1,4 @@
+import { runtimeEnv, hasRuntimeEnv } from "@/lib/runtime-env";
 import { NextRequest } from "next/server";
 import { firebaseAdminDiagnostic, adminAuth, adminDb } from "@/lib/firebase-admin";
 
@@ -12,13 +13,17 @@ export async function GET(req: NextRequest) {
 
   const diagnostic: any = {
     ...firebaseAdminDiagnostic(),
-    serverEnvTestPresent: Boolean(process.env.SERVER_ENV_TEST),
-    serverEnvTestValue: process.env.SERVER_ENV_TEST || null,
-    cloudinaryCloudNamePresent: Boolean(process.env.CLOUDINARY_CLOUD_NAME),
-    cloudinaryApiKeyPresent: Boolean(process.env.CLOUDINARY_API_KEY),
-    cloudinaryApiSecretPresent: Boolean(process.env.CLOUDINARY_API_SECRET),
-    vtcallEncryptionKeyPresent: Boolean(process.env.VTCALL_CREDENTIALS_ENCRYPTION_KEY),
-    vtcallAccessTokenPresent: Boolean(process.env.VTCALL_ACCESS_TOKEN),
+    serverEnvTestPresent: hasRuntimeEnv("SERVER_ENV_TEST"),
+    serverEnvTestValue: runtimeEnv("SERVER_ENV_TEST") || null,
+    cloudinaryCloudNamePresent: hasRuntimeEnv("CLOUDINARY_CLOUD_NAME"),
+    cloudinaryApiKeyPresent: hasRuntimeEnv("CLOUDINARY_API_KEY"),
+    cloudinaryApiSecretPresent: hasRuntimeEnv("CLOUDINARY_API_SECRET"),
+    vtcallEncryptionKeyPresent: hasRuntimeEnv("VTCALL_CREDENTIALS_ENCRYPTION_KEY"),
+    vtcallAccessTokenPresent: hasRuntimeEnv("VTCALL_ACCESS_TOKEN"),
+    vercelEnv: runtimeEnv("VERCEL_ENV") || null,
+    vercelTargetEnv: runtimeEnv("VERCEL_TARGET_ENV") || null,
+    nodeEnv: runtimeEnv("NODE_ENV") || null,
+    runtimeEnvKeyCount: Object.keys(process.env).length,
   };
 
   if (!diagnostic.ok) {

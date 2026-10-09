@@ -1,9 +1,8 @@
 "use client";
 
-import { doc, serverTimestamp, updateDoc, addDoc, collection } from "firebase/firestore";
 import { Camera, ShieldCheck } from "lucide-react";
 import { ChangeEvent, useState } from "react";
-import { auth, db } from "@/lib/firebase";
+import { auth } from "@/lib/firebase";
 import { useSession } from "./AuthGate";
 
 export default function ProfilePanel(){
@@ -21,9 +20,10 @@ export default function ProfilePanel(){
    const raw=await res.text();
    let result:any={};
    if(raw){try{result=JSON.parse(raw)}catch{result={error:`Resposta inválida do servidor (HTTP ${res.status}).`}}}
-   if(!res.ok||!result.url)throw new Error(result.error||`Falha ao enviar imagem (HTTP ${res.status})`);
-   await updateDoc(doc(db,"users",user.uid),{photoUrl:result.url,updatedAt:serverTimestamp()});
-   addDoc(collection(db,"auditLogs"),{userId:user.uid,userName:currentProfile.name,userEmail:currentProfile.email,action:"PROFILE_PHOTO_UPDATED",createdAt:serverTimestamp()}).catch(()=>undefined);
+   if(!res.ok||!result.url){
+    const detail=result.technical?` — ${result.technical}`:"";
+    throw new Error(`${result.error||`Falha ao enviar imagem (HTTP ${res.status})`}${detail}`);
+   }
    setPhoto(result.url);setMessage("Foto atualizada com sucesso.");
   }catch(e){setMessage(e instanceof Error?e.message:"Erro no upload")}finally{setLoading(false)}
  }

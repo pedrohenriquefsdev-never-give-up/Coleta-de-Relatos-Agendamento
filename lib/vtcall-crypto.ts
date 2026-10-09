@@ -1,7 +1,8 @@
+import { runtimeEnv } from "@/lib/runtime-env";
 import crypto from "node:crypto";
 
 function key() {
-  const raw = process.env.VTCALL_CREDENTIALS_ENCRYPTION_KEY || "";
+  const raw = runtimeEnv("VTCALL_CREDENTIALS_ENCRYPTION_KEY") || "";
   if (!raw) throw new Error("VTCALL_CREDENTIALS_ENCRYPTION_KEY não configurada.");
   try {
     const decoded = Buffer.from(raw, "base64");

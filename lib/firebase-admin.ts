@@ -1,3 +1,4 @@
+import { runtimeEnv } from "@/lib/runtime-env";
 import { cert, getApps, initializeApp } from "firebase-admin/app";
 import { getAuth } from "firebase-admin/auth";
 import { getFirestore } from "firebase-admin/firestore";
@@ -32,22 +33,22 @@ function normalizePrivateKey(value?: string) {
 function credentials() {
   // Preferred explicit variables used by this project.
   let projectId =
-    clean(process.env.FIREBASE_ADMIN_PROJECT_ID) ||
-    clean(process.env.FIREBASE_PROJECT_ID) ||
-    clean(process.env.GCLOUD_PROJECT);
+    clean(runtimeEnv("FIREBASE_ADMIN_PROJECT_ID")) ||
+    clean(runtimeEnv("FIREBASE_PROJECT_ID")) ||
+    clean(runtimeEnv("GCLOUD_PROJECT"));
 
   let clientEmail =
-    clean(process.env.FIREBASE_ADMIN_CLIENT_EMAIL) ||
-    clean(process.env.FIREBASE_CLIENT_EMAIL);
+    clean(runtimeEnv("FIREBASE_ADMIN_CLIENT_EMAIL")) ||
+    clean(runtimeEnv("FIREBASE_CLIENT_EMAIL"));
 
   let privateKey =
-    normalizePrivateKey(process.env.FIREBASE_ADMIN_PRIVATE_KEY) ||
-    normalizePrivateKey(process.env.FIREBASE_PRIVATE_KEY);
+    normalizePrivateKey(runtimeEnv("FIREBASE_ADMIN_PRIVATE_KEY")) ||
+    normalizePrivateKey(runtimeEnv("FIREBASE_PRIVATE_KEY"));
 
   // Optional fallback: entire service account JSON in one environment variable.
   const serviceAccountRaw =
-    clean(process.env.FIREBASE_SERVICE_ACCOUNT_KEY) ||
-    clean(process.env.FIREBASE_SERVICE_ACCOUNT_JSON);
+    clean(runtimeEnv("FIREBASE_SERVICE_ACCOUNT_KEY")) ||
+    clean(runtimeEnv("FIREBASE_SERVICE_ACCOUNT_JSON"));
 
   if (serviceAccountRaw && (!projectId || !clientEmail || !privateKey)) {
     try {
@@ -86,24 +87,24 @@ export const adminDb = () => getFirestore(adminApp());
 
 export function firebaseAdminDiagnostic() {
   const rawProjectId =
-    process.env.FIREBASE_ADMIN_PROJECT_ID ||
-    process.env.FIREBASE_PROJECT_ID ||
-    process.env.GCLOUD_PROJECT ||
+    runtimeEnv("FIREBASE_ADMIN_PROJECT_ID") ||
+    runtimeEnv("FIREBASE_PROJECT_ID") ||
+    runtimeEnv("GCLOUD_PROJECT") ||
     "";
 
   const rawClientEmail =
-    process.env.FIREBASE_ADMIN_CLIENT_EMAIL ||
-    process.env.FIREBASE_CLIENT_EMAIL ||
+    runtimeEnv("FIREBASE_ADMIN_CLIENT_EMAIL") ||
+    runtimeEnv("FIREBASE_CLIENT_EMAIL") ||
     "";
 
   const rawPrivateKey =
-    process.env.FIREBASE_ADMIN_PRIVATE_KEY ||
-    process.env.FIREBASE_PRIVATE_KEY ||
+    runtimeEnv("FIREBASE_ADMIN_PRIVATE_KEY") ||
+    runtimeEnv("FIREBASE_PRIVATE_KEY") ||
     "";
 
   const rawServiceAccount =
-    process.env.FIREBASE_SERVICE_ACCOUNT_KEY ||
-    process.env.FIREBASE_SERVICE_ACCOUNT_JSON ||
+    runtimeEnv("FIREBASE_SERVICE_ACCOUNT_KEY") ||
+    runtimeEnv("FIREBASE_SERVICE_ACCOUNT_JSON") ||
     "";
 
   const result: any = {

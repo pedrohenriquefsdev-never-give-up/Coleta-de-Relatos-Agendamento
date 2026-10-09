@@ -1,0 +1,2 @@
+Portal Coleta de Relatos - V1.36
+Click to Call 403 diagnostic + Showpeer token validation + VTCall env normalization.
