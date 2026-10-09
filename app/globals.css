@@ -1770,3 +1770,110 @@
   font-size:12px;
   line-height:1.45;
 }
+
+/* V1.39 - operational consolidation */
+.quick-ready{
+  font-size:9px;
+  font-weight:850;
+  text-transform:uppercase;
+  color:#1f6f48;
+  background:rgba(37,115,74,.12);
+  padding:5px 8px;
+  border-radius:999px;
+}
+.table-filter{width:auto;min-width:150px;padding:9px 32px 9px 11px}
+.table-date-filter{width:auto;min-width:145px;padding:9px 11px}
+.compact-empty{padding:18px 10px}
+.status-em_contato{background:rgba(244,196,0,.14);color:#9a7d00}
+.status-nao_atendeu{background:rgba(210,122,54,.13);color:#b2642d}
+.status-reagendar{background:rgba(120,90,180,.12);color:#7757ac}
+.status-concluido{background:rgba(37,115,74,.12);color:var(--success)}
+.status-nao_compareceu{background:rgba(120,120,120,.13);color:var(--muted)}
+.appointment-card.em_contato{border-left-color:#d2aa10;background:rgba(244,196,0,.10)}
+.appointment-card.nao_atendeu{border-left-color:#d27a36;background:rgba(210,122,54,.10)}
+.appointment-card.reagendar{border-left-color:#7757ac;background:rgba(120,90,180,.10)}
+.appointment-card.concluido{border-left-color:#399a60;background:rgba(57,154,96,.10)}
+.appointment-card.nao_compareceu{border-left-color:#7d7d7d;background:rgba(125,125,125,.09)}
+
+.ramal-status-bar{
+  display:flex;
+  align-items:center;
+  justify-content:space-between;
+  gap:10px;
+  min-height:46px;
+  padding:8px 10px 8px 12px;
+  border:1px solid var(--line);
+  border-radius:12px;
+  background:var(--surface-2);
+}
+.ramal-status-copy{display:flex;align-items:center;gap:8px;min-width:0;color:var(--muted);font-size:11px}
+.ramal-status-copy>svg{color:var(--yellow);flex:none}
+.ramal-status-copy strong{color:var(--text)}
+.ramal-status-pill{display:inline-flex;align-items:center;gap:5px;padding:5px 8px;border-radius:999px;font-size:9px;font-weight:850;white-space:nowrap}
+.ramal-status-pill:before{content:"";width:6px;height:6px;border-radius:50%;background:currentColor}
+.ramal-status-pill.available{background:rgba(37,115,74,.12);color:#3b9b69}
+.ramal-status-pill.busy{background:rgba(195,59,59,.12);color:#d45b5b}
+.ramal-status-pill.offline{background:rgba(125,125,125,.12);color:var(--muted)}
+.ramal-status-pill.checking{background:rgba(244,196,0,.10);color:#b49100}
+
+.duplicate-warning{
+  display:grid;
+  gap:5px;
+  padding:11px 12px;
+  border-radius:12px;
+  border:1px solid rgba(210,122,54,.26);
+  background:rgba(210,122,54,.07);
+  color:var(--muted);
+  font-size:10.5px;
+}
+.duplicate-warning strong{color:#bd6c31;font-size:11px}
+.duplicate-warning span{display:block}
+
+.call-history-card{
+  border:1px solid var(--line);
+  border-radius:14px;
+  overflow:hidden;
+  background:var(--surface-2);
+}
+.call-history-head{
+  display:flex;
+  align-items:center;
+  justify-content:space-between;
+  gap:10px;
+  padding:10px 11px;
+  border-bottom:1px solid var(--line);
+}
+.call-history-head>div{display:flex;align-items:center;gap:9px;min-width:0}
+.call-history-head>div>svg{color:var(--yellow);flex:none}
+.call-history-head span{display:flex;flex-direction:column}
+.call-history-head strong{font-size:11px}
+.call-history-head small{font-size:9px;color:var(--muted);margin-top:2px}
+.call-history-list{display:grid}
+.call-history-item{
+  display:grid;
+  grid-template-columns:28px 1fr auto;
+  align-items:center;
+  gap:9px;
+  padding:9px 11px;
+  border-bottom:1px solid var(--line);
+}
+.call-history-item:last-child{border-bottom:0}
+.call-history-icon{width:28px;height:28px;border-radius:9px;background:rgba(244,196,0,.09);color:var(--yellow);display:grid;place-items:center}
+.call-history-item>div{display:flex;flex-direction:column;min-width:0}
+.call-history-item strong{font-size:10.5px}
+.call-history-item small{font-size:9px;color:var(--muted);margin-top:2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.call-history-empty{padding:14px 12px;color:var(--muted);font-size:10px}
+.call-reference{font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-size:9px;color:var(--muted);word-break:break-all}
+.form-footnote{font-size:9px;color:var(--muted);text-align:right}
+.spin-icon{animation:spin-v139 .8s linear infinite}
+@keyframes spin-v139{to{transform:rotate(360deg)}}
+
+@media(max-width:900px){
+  .table-filter,.table-date-filter{width:100%;min-width:0}
+}
+@media(max-width:700px){
+  .ramal-status-bar{align-items:flex-start}
+  .ramal-status-copy{flex-wrap:wrap}
+  .call-history-item{grid-template-columns:28px 1fr}
+  .call-history-item>.pill{grid-column:2;justify-self:start}
+}

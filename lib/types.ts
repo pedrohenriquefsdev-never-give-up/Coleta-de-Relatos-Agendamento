@@ -1,5 +1,14 @@
 export type UserRole = "admin" | "atendente" | "consulta";
-export type AppointmentStatus = "agendado" | "confirmado" | "atendido" | "cancelado" | "nao_compareceu";
+export type AppointmentStatus =
+  | "agendado"
+  | "confirmado"
+  | "em_contato"
+  | "nao_atendeu"
+  | "reagendar"
+  | "concluido"
+  | "atendido"
+  | "cancelado"
+  | "nao_compareceu";
 
 export interface AppUser {
   uid: string;
@@ -44,5 +53,18 @@ export interface Appointment {
     lastAttemptId?: string;
     extension?: string;
     phone?: string;
+    preExistingCall?: boolean;
+    showpeerBefore?: {
+      ok?: boolean;
+      status?: number | null;
+      active?: boolean;
+      count?: number;
+    };
+    showpeerAfter?: {
+      ok?: boolean;
+      status?: number | null;
+      active?: boolean;
+      count?: number;
+    };
   };
 }

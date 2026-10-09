@@ -61,3 +61,14 @@ A chave privada pode ser colada com `\n` literais ou como PEM multilinha; a V1.2
 Também há suporte opcional a `FIREBASE_SERVICE_ACCOUNT_KEY` com o JSON completo da conta de serviço.
 
 Depois de alterar Environment Variables, faça um novo deploy.
+
+
+## V1.39 — Consolidação operacional
+- Status do ramal VTCall no agendamento (Disponível / Em chamada / Não configurado).
+- Atualização automática do Showpeer a cada 10 segundos enquanto o agendamento está aberto.
+- Histórico de tentativas de ligação por agendamento.
+- Filtros por status e data na lista de agendamentos.
+- Novos status operacionais: Em contato, Não atendeu, Reagendar e Concluído.
+- Alerta não bloqueante de possível duplicidade por placa/telefone em datas próximas.
+- Atalho VTCall do painel atualizado para refletir integração ativa.
+- Instrumentação de investigação da V1.38 mantida somente no backend, sem alerta específico no modal.

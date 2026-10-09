@@ -1,0 +1,2 @@
+Portal Coleta de Relatos - V1.39
+Status do ramal via Showpeer, histórico de tentativas VTCall, filtros operacionais, novos status e alerta de duplicidade.

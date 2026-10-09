@@ -1,8 +1,8 @@
 "use client";
 
 import { addDoc, collection, deleteDoc, doc, serverTimestamp, updateDoc } from "firebase/firestore";
-import { PhoneCall, Trash2 } from "lucide-react";
-import { useMemo, useState } from "react";
+import { History, PhoneCall, RefreshCw, Trash2 } from "lucide-react";
+import { useEffect, useMemo, useState } from "react";
 import { db } from "@/lib/firebase";
 import { useSession } from "./AuthGate";
 import Modal from "./Modal";
@@ -10,6 +10,38 @@ import type { Appointment, AppointmentStatus } from "@/lib/types";
 
 const cleanPlate = (v: string) => v.toUpperCase().replace(/[^A-Z0-9]/g, "").slice(0, 7);
 const cleanPhone = (v: string) => v.replace(/\D/g, "").slice(0, 11);
+
+const statusLabels: Record<AppointmentStatus, string> = {
+  agendado: "Agendado",
+  confirmado: "Confirmado",
+  em_contato: "Em contato",
+  nao_atendeu: "Não atendeu",
+  reagendar: "Reagendar",
+  concluido: "Concluído",
+  atendido: "Concluído",
+  cancelado: "Cancelado",
+  nao_compareceu: "Não compareceu",
+};
+
+type RamalStatus = {
+  configured: boolean;
+  extension: string;
+  ok?: boolean;
+  providerStatus?: number | null;
+  active: boolean;
+  available: boolean;
+  count: number;
+};
+
+type CallAttempt = {
+  id: string;
+  status: string;
+  extension: string;
+  phone: string;
+  userName: string;
+  providerResponse: string;
+  requestedAt: string | null;
+};
 
 async function tryWriteAudit(payload: Record<string, unknown>) {
   try {
@@ -23,12 +55,16 @@ export default function AppointmentModal({
   initial,
   defaultDate,
   defaultTime,
+  existingAppointments = [],
+  readOnly = false,
   onClose,
   onSaved,
 }: {
   initial?: Appointment | null;
   defaultDate?: string;
   defaultTime?: string;
+  existingAppointments?: Appointment[];
+  readOnly?: boolean;
   onClose: () => void;
   onSaved: () => void;
 }) {
@@ -37,8 +73,11 @@ export default function AppointmentModal({
   const [deleting, setDeleting] = useState(false);
   const [calling, setCalling] = useState(false);
   const [callMessage, setCallMessage] = useState("");
-  const [callWarning, setCallWarning] = useState("");
   const [error, setError] = useState("");
+  const [ramalStatus, setRamalStatus] = useState<RamalStatus | null>(null);
+  const [ramalLoading, setRamalLoading] = useState(false);
+  const [callAttempts, setCallAttempts] = useState<CallAttempt[]>([]);
+  const [historyLoading, setHistoryLoading] = useState(false);
   const [form, setForm] = useState({
     plate: initial?.plate || "",
     fullName: initial?.fullName || "",
@@ -47,20 +86,109 @@ export default function AppointmentModal({
     date: initial?.date || defaultDate || new Date().toISOString().slice(0, 10),
     time: initial?.time || defaultTime || "08:00",
     durationMinutes: initial?.durationMinutes || 30,
-    status: (initial?.status || "agendado") as AppointmentStatus,
+    status: ((initial?.status === "atendido" ? "concluido" : initial?.status) || "agendado") as AppointmentStatus,
     notes: initial?.notes || "",
   });
 
   const title = useMemo(() => (initial ? `Agendamento • ${initial.plate}` : "Novo agendamento"), [initial]);
-  const canDelete = !!initial && profile?.role === "admin";
+  const canDelete = !!initial && !readOnly && profile?.role === "admin";
+
+  const duplicateMatches = useMemo(() => {
+    const plate = cleanPlate(form.plate);
+    const phone = cleanPhone(form.phone);
+    if ((!plate && !phone) || !form.date) return [];
+
+    const target = new Date(`${form.date}T12:00:00`).getTime();
+    return existingAppointments
+      .filter((item) => item.id !== initial?.id && item.status !== "cancelado")
+      .filter((item) => {
+        const samePlate = plate.length >= 7 && cleanPlate(item.plate) === plate;
+        const samePhone = phone.length >= 8 && cleanPhone(item.phoneDigits || item.phone) === phone;
+        if (!samePlate && !samePhone) return false;
+        const itemDate = new Date(`${item.date}T12:00:00`).getTime();
+        return Math.abs(itemDate - target) <= 86400000;
+      })
+      .slice(0, 3);
+  }, [existingAppointments, form.date, form.phone, form.plate, initial?.id]);
+
+  async function getToken() {
+    return user?.getIdToken();
+  }
+
+  async function refreshRamalStatus(silent = false): Promise<RamalStatus | null> {
+    if (!initial || !user) return null;
+    if (!silent) setRamalLoading(true);
+    try {
+      const token = await getToken();
+      const res = await fetch(`/api/vtcall/status?t=${Date.now()}`, {
+        headers: { Authorization: `Bearer ${token}` },
+        cache: "no-store",
+      });
+      const data = await res.json();
+      if (!res.ok) return null;
+      setRamalStatus(data);
+      return data;
+    } catch {
+      return null;
+    } finally {
+      if (!silent) setRamalLoading(false);
+    }
+  }
+
+  async function loadCallHistory(silent = false) {
+    if (!initial || !user) return;
+    if (!silent) setHistoryLoading(true);
+    try {
+      const token = await getToken();
+      const res = await fetch(`/api/vtcall/attempts?appointmentId=${encodeURIComponent(initial.id)}&t=${Date.now()}`, {
+        headers: { Authorization: `Bearer ${token}` },
+        cache: "no-store",
+      });
+      const data = await res.json();
+      if (res.ok) setCallAttempts(Array.isArray(data.attempts) ? data.attempts : []);
+    } catch {
+      // histórico é complementar ao agendamento
+    } finally {
+      if (!silent) setHistoryLoading(false);
+    }
+  }
+
+  useEffect(() => {
+    if (!initial || !user) return;
+    let mounted = true;
+
+    const load = async () => {
+      if (!mounted) return;
+      await refreshRamalStatus(true);
+    };
+
+    setRamalLoading(true);
+    Promise.all([load(), loadCallHistory()]).finally(() => mounted && setRamalLoading(false));
+    const timer = window.setInterval(load, 10000);
+    return () => {
+      mounted = false;
+      window.clearInterval(timer);
+    };
+    // o id identifica a abertura deste agendamento
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [initial?.id, user]);
 
   async function openVTCall() {
+    if (readOnly) return setError("Seu perfil possui acesso somente para consulta.");
     const phone = cleanPhone(form.phone);
     if (!phone) return setError("Informe um telefone válido antes de iniciar a ligação.");
     if (!initial) return setError("Salve o agendamento antes de iniciar uma ligação.");
-    setError(""); setCallMessage(""); setCallWarning(""); setCalling(true);
+
+    setError("");
+    setCallMessage("");
+    setCalling(true);
+
     try {
-      const token = await user?.getIdToken();
+      const freshStatus = await refreshRamalStatus(true);
+      if (freshStatus?.configured === false) throw new Error("Seu ramal VTCall ainda não foi configurado.");
+      if (freshStatus?.active) throw new Error(`O ramal ${freshStatus.extension} já está em uma chamada. Finalize a ligação atual antes de iniciar outra.`);
+
+      const token = await getToken();
       const res = await fetch("/api/vtcall/call", {
         method: "POST",
         headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
@@ -74,16 +202,29 @@ export default function AppointmentModal({
         const showpeer = data.showpeerDiagnostic?.status ? ` [Showpeer HTTP ${data.showpeerDiagnostic.status}]` : "";
         throw new Error(`${data.error || "Não foi possível iniciar a ligação."}${detail}${showpeer}`);
       }
+
       setCallMessage(data.message || "Ligação solicitada. Aguarde o seu ramal tocar.");
-      if (data.showpeer?.before?.active) {
-        setCallWarning(`O Showpeer encontrou ${data.showpeer.before.count} chamada(s) ativa(s) no seu ramal antes do Click to Call. Isso pode explicar áudio/sessão anterior antes do Answer.`);
+      if (data.showpeer?.after) {
+        setRamalStatus((prev) => ({
+          configured: true,
+          extension: prev?.extension || initial.call?.extension || "",
+          ok: data.showpeer.after.ok,
+          providerStatus: data.showpeer.after.status,
+          active: Boolean(data.showpeer.after.active),
+          available: Boolean(data.showpeer.after.ok) && !data.showpeer.after.active,
+          count: Number(data.showpeer.after.count || 0),
+        }));
       }
+      await loadCallHistory(true);
     } catch (e) {
       setError(e instanceof Error ? e.message : "Não foi possível iniciar a ligação.");
-    } finally { setCalling(false); }
+    } finally {
+      setCalling(false);
+    }
   }
 
   async function save() {
+    if (readOnly) return;
     setError("");
     if (!form.plate || !form.fullName || !form.phone || !form.email || !form.date || !form.time) {
       return setError("Preencha os campos obrigatórios.");
@@ -107,7 +248,7 @@ export default function AppointmentModal({
           userEmail: profile!.email,
           action: "APPOINTMENT_UPDATED",
           targetId: initial.id,
-          details: { plate: payload.plate },
+          details: { plate: payload.plate, fullName: payload.fullName, phone: payload.phone, status: payload.status },
         });
       } else {
         const created = await addDoc(collection(db, "appointments"), {
@@ -122,7 +263,7 @@ export default function AppointmentModal({
           userEmail: profile!.email,
           action: "APPOINTMENT_CREATED",
           targetId: created.id,
-          details: { plate: payload.plate },
+          details: { plate: payload.plate, fullName: payload.fullName, phone: payload.phone, status: payload.status },
         });
       }
 
@@ -150,7 +291,7 @@ export default function AppointmentModal({
         userEmail: profile!.email,
         action: "APPOINTMENT_DELETED",
         targetId: initial.id,
-        details: { plate: initial.plate },
+        details: { plate: initial.plate, fullName: initial.fullName, phone: initial.phone },
       });
       onSaved();
       onClose();
@@ -160,6 +301,20 @@ export default function AppointmentModal({
       setDeleting(false);
     }
   }
+
+  const ramalText = ramalLoading && !ramalStatus
+    ? "Verificando..."
+    : ramalStatus?.configured === false
+      ? "Não configurado"
+      : ramalStatus?.active
+        ? "Em chamada"
+        : ramalStatus?.available
+          ? "Sem chamada ativa"
+          : ramalStatus?.configured
+            ? "Status indisponível"
+            : "Verificando...";
+
+  const ramalClass = ramalStatus?.active ? "busy" : ramalStatus?.available ? "available" : ramalStatus?.configured === false ? "offline" : "checking";
 
   return (
     <Modal
@@ -175,24 +330,39 @@ export default function AppointmentModal({
           )}
           <div className="footer-spacer" />
           <button className="btn" onClick={onClose} disabled={saving || deleting}>
-            Cancelar
+            {readOnly ? "Fechar" : "Cancelar"}
           </button>
-          <button className="btn primary" onClick={save} disabled={saving || deleting}>
-            {saving ? "Salvando..." : "Salvar agendamento"}
-          </button>
+          {!readOnly && (
+            <button className="btn primary" onClick={save} disabled={saving || deleting}>
+              {saving ? "Salvando..." : "Salvar agendamento"}
+            </button>
+          )}
         </>
       }
     >
       <div className="stack">
         {error && <div className="error">{error}</div>}
+        {readOnly && <div className="info-note">Visualização em modo consulta. Este perfil não pode alterar o agendamento nem iniciar ligações.</div>}
+
+        {!readOnly && duplicateMatches.length > 0 && (
+          <div className="duplicate-warning">
+            <strong>Possível agendamento duplicado</strong>
+            {duplicateMatches.map((item) => (
+              <span key={item.id}>
+                {item.date.split("-").reverse().join("/")} às {item.time} • {item.plate} • {item.fullName}
+              </span>
+            ))}
+          </div>
+        )}
+
         <div className="grid-2">
           <div className="field">
             <label>Placa *</label>
-            <input className="input" value={form.plate} onChange={(e) => setForm({ ...form, plate: cleanPlate(e.target.value) })} placeholder="ABC1D23" />
+            <input className="input" disabled={readOnly} value={form.plate} onChange={(e) => setForm({ ...form, plate: cleanPlate(e.target.value) })} placeholder="ABC1D23" />
           </div>
           <div className="field">
             <label>Nome completo *</label>
-            <input className="input" value={form.fullName} onChange={(e) => setForm({ ...form, fullName: e.target.value })} />
+            <input className="input" disabled={readOnly} value={form.fullName} onChange={(e) => setForm({ ...form, fullName: e.target.value })} />
           </div>
         </div>
 
@@ -200,33 +370,52 @@ export default function AppointmentModal({
           <div className="field">
             <label>Telefone atualizado *</label>
             <div className="phone-field-wrap">
-              <input className="input" value={form.phone} onChange={(e) => setForm({ ...form, phone: cleanPhone(e.target.value) })} placeholder="81999999999" />
-              {initial && (
-                <button type="button" className="phone-vtcall-btn" onClick={openVTCall} disabled={calling} title="Ligar pelo VTCall">
+              <input className="input" disabled={readOnly} value={form.phone} onChange={(e) => setForm({ ...form, phone: cleanPhone(e.target.value) })} placeholder="81999999999" />
+              {initial && !readOnly && (
+                <button
+                  type="button"
+                  className="phone-vtcall-btn"
+                  onClick={openVTCall}
+                  disabled={calling || ramalStatus?.configured === false || ramalStatus?.active}
+                  title={ramalStatus?.active ? "Seu ramal já está em chamada" : "Ligar pelo VTCall"}
+                >
                   <PhoneCall size={15} />
-                  <span>{calling ? "Chamando..." : (form.phone || "Ligar via VTCall")}</span>
+                  <span>{calling ? "Chamando..." : "Ligar via VTCall"}</span>
                 </button>
               )}
             </div>
           </div>
           <div className="field">
             <label>E-mail *</label>
-            <input className="input" type="email" value={form.email} onChange={(e) => setForm({ ...form, email: e.target.value })} />
+            <input className="input" disabled={readOnly} type="email" value={form.email} onChange={(e) => setForm({ ...form, email: e.target.value })} />
           </div>
         </div>
+
+        {initial && (
+          <div className="ramal-status-bar">
+            <div className="ramal-status-copy">
+              <PhoneCall size={15} />
+              <span>Ramal <strong>{ramalStatus?.extension || initial.call?.extension || "—"}</strong></span>
+              <span className={`ramal-status-pill ${ramalClass}`}>{ramalText}</span>
+            </div>
+            <button type="button" className="icon-btn mini" onClick={() => refreshRamalStatus()} disabled={ramalLoading} title="Atualizar status do ramal">
+              <RefreshCw size={14} className={ramalLoading ? "spin-icon" : ""} />
+            </button>
+          </div>
+        )}
 
         <div className="grid-3">
           <div className="field">
             <label>Data *</label>
-            <input className="input" type="date" value={form.date} onChange={(e) => setForm({ ...form, date: e.target.value })} />
+            <input className="input" disabled={readOnly} type="date" value={form.date} onChange={(e) => setForm({ ...form, date: e.target.value })} />
           </div>
           <div className="field">
             <label>Horário *</label>
-            <input className="input" type="time" value={form.time} onChange={(e) => setForm({ ...form, time: e.target.value })} />
+            <input className="input" disabled={readOnly} type="time" value={form.time} onChange={(e) => setForm({ ...form, time: e.target.value })} />
           </div>
           <div className="field">
             <label>Duração</label>
-            <select className="select" value={form.durationMinutes} onChange={(e) => setForm({ ...form, durationMinutes: Number(e.target.value) })}>
+            <select className="select" disabled={readOnly} value={form.durationMinutes} onChange={(e) => setForm({ ...form, durationMinutes: Number(e.target.value) })}>
               <option value={20}>20 min</option>
               <option value={30}>30 min</option>
               <option value={45}>45 min</option>
@@ -237,10 +426,13 @@ export default function AppointmentModal({
 
         <div className="field">
           <label>Status</label>
-          <select className="select" value={form.status} onChange={(e) => setForm({ ...form, status: e.target.value as AppointmentStatus })}>
+          <select className="select" disabled={readOnly} value={form.status} onChange={(e) => setForm({ ...form, status: e.target.value as AppointmentStatus })}>
             <option value="agendado">Agendado</option>
             <option value="confirmado">Confirmado</option>
-            <option value="atendido">Atendido</option>
+            <option value="em_contato">Em contato</option>
+            <option value="nao_atendeu">Não atendeu</option>
+            <option value="reagendar">Reagendar</option>
+            <option value="concluido">Concluído</option>
             <option value="cancelado">Cancelado</option>
             <option value="nao_compareceu">Não compareceu</option>
           </select>
@@ -248,14 +440,53 @@ export default function AppointmentModal({
 
         <div className="field">
           <label>Observações</label>
-          <textarea className="textarea" value={form.notes} onChange={(e) => setForm({ ...form, notes: e.target.value })} placeholder="Informações adicionais..." />
+          <textarea className="textarea" disabled={readOnly} value={form.notes} onChange={(e) => setForm({ ...form, notes: e.target.value })} placeholder="Informações adicionais..." />
         </div>
 
-        {callWarning && <div className="warning">{callWarning}</div>}
         {callMessage && <div className="success">{callMessage}</div>}
-        {initial?.call?.callId && (
-          <div className="success">Ligação VTCall vinculada: <strong>{initial.call.callId}</strong></div>
+
+        {initial && (
+          <div className="call-history-card">
+            <div className="call-history-head">
+              <div>
+                <History size={16} />
+                <span><strong>Histórico de ligações</strong><small>Tentativas realizadas a partir deste agendamento.</small></span>
+              </div>
+              <button type="button" className="icon-btn mini" onClick={() => loadCallHistory()} disabled={historyLoading} title="Atualizar histórico">
+                <RefreshCw size={14} className={historyLoading ? "spin-icon" : ""} />
+              </button>
+            </div>
+
+            {historyLoading && callAttempts.length === 0 ? (
+              <div className="call-history-empty">Carregando ligações...</div>
+            ) : callAttempts.length === 0 ? (
+              <div className="call-history-empty">Nenhuma ligação iniciada por este agendamento.</div>
+            ) : (
+              <div className="call-history-list">
+                {callAttempts.slice(0, 8).map((attempt) => (
+                  <div className="call-history-item" key={attempt.id}>
+                    <span className="call-history-icon"><PhoneCall size={13} /></span>
+                    <div>
+                      <strong>Ligação solicitada</strong>
+                      <small>
+                        {attempt.requestedAt ? new Date(attempt.requestedAt).toLocaleString("pt-BR", { dateStyle: "short", timeStyle: "short" }) : "Data indisponível"}
+                        {attempt.extension ? ` • Ramal ${attempt.extension}` : ""}
+                        {attempt.userName ? ` • ${attempt.userName}` : ""}
+                      </small>
+                    </div>
+                    <span className="pill status-em_contato">{attempt.status === "requested" ? "Solicitada" : attempt.status}</span>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
         )}
+
+        {initial?.call?.lastAttemptId && (
+          <div className="call-reference">Última tentativa VTCall: {initial.call.lastAttemptId}</div>
+        )}
+
+        <div className="form-footnote">Status atual: {statusLabels[form.status]}</div>
       </div>
     </Modal>
   );

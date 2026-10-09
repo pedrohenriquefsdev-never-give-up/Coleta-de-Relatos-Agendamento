@@ -4,6 +4,7 @@ import { FieldValue } from "firebase-admin/firestore";
 import { adminDb } from "@/lib/firebase-admin";
 import { requireUser } from "@/lib/server-auth";
 import { safeServerError } from "@/lib/server-error";
+import { readShowpeer } from "@/lib/vtcall-showpeer";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -11,52 +12,13 @@ export const dynamic = "force-dynamic";
 
 const cleanPhone = (v: string) => String(v || "").replace(/\D/g, "");
 
-async function readShowpeer(extension: string, token: string) {
-  const base = vtEnv("VTCALL_SHOWPEER_URL", "https://api23.vtcall.app/API/showpeer");
-  try {
-    const url = new URL(base);
-    url.searchParams.set("ramal", extension);
-
-    const response = await fetch(url.toString(), {
-      method: "GET",
-      headers: {
-        access_token: token,
-        "access-token": token,
-      },
-      cache: "no-store",
-      redirect: "follow",
-    });
-
-    const raw = await response.text();
-    let data: any = null;
-    try { data = raw ? JSON.parse(raw) : null; } catch { data = raw || null; }
-
-    const calls = Array.isArray(data) ? data : [];
-    return {
-      ok: response.ok,
-      status: response.status,
-      url: response.url || url.toString(),
-      active: response.ok && calls.length > 0,
-      count: response.ok ? calls.length : 0,
-      calls: response.ok ? calls.slice(0, 10) : [],
-      providerMessage: !response.ok ? String(raw || "").slice(0, 250) : null,
-    };
-  } catch (e: any) {
-    return {
-      ok: false,
-      status: null,
-      url: base,
-      active: false,
-      count: 0,
-      calls: [],
-      providerMessage: String(e?.message || e).slice(0, 250),
-    };
-  }
-}
 
 export async function POST(req: NextRequest) {
   try {
     const user = await requireUser(req);
+    if (user.role !== "admin" && user.role !== "atendente") {
+      return Response.json({ error: "Seu perfil possui acesso somente para consulta." }, { status: 403 });
+    }
     const body = await req.json();
     const phone = cleanPhone(body.phone);
     const appointmentId = String(body.appointmentId || "").trim();
@@ -187,8 +149,17 @@ export async function POST(req: NextRequest) {
       preExistingCall: Boolean(showpeerBefore?.active),
     });
 
+    let appointmentDetails: { fullName?: string; plate?: string } = {};
     if (appointmentId) {
-      await adminDb().collection("appointments").doc(appointmentId).set({
+      const appointmentRef = adminDb().collection("appointments").doc(appointmentId);
+      const appointmentSnap = await appointmentRef.get();
+      if (appointmentSnap.exists) {
+        appointmentDetails = {
+          fullName: String(appointmentSnap.data()?.fullName || ""),
+          plate: String(appointmentSnap.data()?.plate || ""),
+        };
+      }
+      await appointmentRef.set({
         call: {
           provider: "vtcall",
           status: "requested",
@@ -224,6 +195,7 @@ export async function POST(req: NextRequest) {
         phone,
         extension,
         attemptId: attempt.id,
+        ...appointmentDetails,
         preExistingCall: Boolean(showpeerBefore?.active),
         showpeerBeforeCount: Number(showpeerBefore?.count || 0),
         showpeerAfterCount: Number(showpeerAfter?.count || 0),
@@ -233,9 +205,7 @@ export async function POST(req: NextRequest) {
 
     return Response.json({
       ok: true,
-      message: showpeerBefore?.active
-        ? "Ligação solicitada. Atenção: o ramal já aparecia em chamada no Showpeer antes do disparo."
-        : "Ligação solicitada. Aguarde o seu ramal tocar.",
+      message: "Ligação solicitada. Aguarde o seu ramal tocar.",
       attemptId: attempt.id,
       showpeer: {
         before: {

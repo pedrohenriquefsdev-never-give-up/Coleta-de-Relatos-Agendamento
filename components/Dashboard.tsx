@@ -11,6 +11,7 @@ import {
   ClipboardList,
   Clock3,
   FileText,
+  Eye,
   History,
   LogOut,
   Pencil,
@@ -73,12 +74,26 @@ const tabLabels: Record<string, string> = {
   vtcall: "VTCall",
 };
 
+const appointmentStatusLabels: Record<string, string> = {
+  agendado: "Agendado",
+  confirmado: "Confirmado",
+  em_contato: "Em contato",
+  nao_atendeu: "Não atendeu",
+  reagendar: "Reagendar",
+  concluido: "Concluído",
+  atendido: "Concluído",
+  cancelado: "Cancelado",
+  nao_compareceu: "Não compareceu",
+};
+
 export default function Dashboard() {
   const { profile, logout } = useSession();
   const [tab, setTab] = useState("agenda");
   const [appointments, setAppointments] = useState<Appointment[]>([]);
   const [logs, setLogs] = useState<any[]>([]);
   const [search, setSearch] = useState("");
+  const [statusFilter, setStatusFilter] = useState("todos");
+  const [dateFilter, setDateFilter] = useState("");
   const [weekOffset, setWeekOffset] = useState(0);
   const [modal, setModal] = useState<{ item?: Appointment | null; date?: string; time?: string } | null>(null);
 
@@ -89,24 +104,36 @@ export default function Dashboard() {
   }, []);
 
   useEffect(() => {
-    return onSnapshot(query(collection(db, "auditLogs"), orderBy("createdAt", "desc"), limit(100)), (snapshot) => {
-      setLogs(snapshot.docs.map((docSnap) => ({ id: docSnap.id, ...docSnap.data() })));
-    });
-  }, []);
+    if (!profile || profile.role !== "admin") {
+      setLogs([]);
+      return;
+    }
+    return onSnapshot(
+      query(collection(db, "auditLogs"), orderBy("createdAt", "desc"), limit(100)),
+      (snapshot) => setLogs(snapshot.docs.map((docSnap) => ({ id: docSnap.id, ...docSnap.data() }))),
+      () => setLogs([]),
+    );
+  }, [profile]);
 
   const start = useMemo(() => addDays(startOfWeek(new Date(), { weekStartsOn: 1 }), weekOffset * 7), [weekOffset]);
   const days = useMemo(() => Array.from({ length: 7 }, (_, i) => addDays(start, i)), [start]);
-  const filtered = appointments.filter((a) => `${a.plate} ${a.fullName} ${a.phone}`.toLowerCase().includes(search.toLowerCase()));
+  const filtered = appointments.filter((a) => {
+    const matchesSearch = `${a.plate} ${a.fullName} ${a.phone}`.toLowerCase().includes(search.toLowerCase());
+    const matchesStatus = statusFilter === "todos" || a.status === statusFilter || (statusFilter === "concluido" && a.status === "atendido");
+    const matchesDate = !dateFilter || a.date === dateFilter;
+    return matchesSearch && matchesStatus && matchesDate;
+  });
 
   const today = format(new Date(), "yyyy-MM-dd");
   const todayItems = appointments.filter((a) => a.date === today && a.status !== "cancelado");
   const confirmed = appointments.filter((a) => a.date === today && a.status === "confirmado").length;
-  const completed = appointments.filter((a) => a.date === today && a.status === "atendido").length;
+  const completed = appointments.filter((a) => a.date === today && (a.status === "atendido" || a.status === "concluido")).length;
   const nextAppointment = todayItems.filter((a) => a.time >= format(new Date(), "HH:mm")).sort((a, b) => a.time.localeCompare(b.time))[0];
 
   if (!profile) return <div className="loading"><div className="spinner" /></div>;
   const currentProfile = profile;
   const canDeleteAppointments = currentProfile.role === "admin";
+  const canEditAppointments = currentProfile.role === "admin" || currentProfile.role === "atendente";
 
   function openEdit(appointment: Appointment) {
     setModal({ item: appointment });
@@ -125,9 +152,26 @@ export default function Dashboard() {
               <Search size={16} />
               <input className="input" placeholder="Placa, nome ou telefone" value={search} onChange={(e) => setSearch(e.target.value)} />
             </div>
-            <button className="btn primary" onClick={() => setModal({})}>
-              <Plus size={16} /> Novo
-            </button>
+            <select className="select table-filter" value={statusFilter} onChange={(e) => setStatusFilter(e.target.value)}>
+              <option value="todos">Todos os status</option>
+              <option value="agendado">Agendado</option>
+              <option value="confirmado">Confirmado</option>
+              <option value="em_contato">Em contato</option>
+              <option value="nao_atendeu">Não atendeu</option>
+              <option value="reagendar">Reagendar</option>
+              <option value="concluido">Concluído</option>
+              <option value="cancelado">Cancelado</option>
+              <option value="nao_compareceu">Não compareceu</option>
+            </select>
+            <input className="input table-date-filter" type="date" value={dateFilter} onChange={(e) => setDateFilter(e.target.value)} title="Filtrar por data" />
+            {(search || statusFilter !== "todos" || dateFilter) && (
+              <button className="btn" onClick={() => { setSearch(""); setStatusFilter("todos"); setDateFilter(""); }}>Limpar</button>
+            )}
+            {canEditAppointments && (
+              <button className="btn primary" onClick={() => setModal({})}>
+                <Plus size={16} /> Novo
+              </button>
+            )}
           </div>
         </div>
 
@@ -154,11 +198,11 @@ export default function Dashboard() {
                     <td><Plate value={a.plate} compact /></td>
                     <td><strong>{a.fullName}</strong></td>
                     <td>{a.phone}</td>
-                    <td><span className={`pill status-${a.status}`}>{a.status.replace("_", " ")}</span></td>
+                    <td><span className={`pill status-${a.status}`}>{appointmentStatusLabels[a.status] || a.status.replaceAll("_", " ")}</span></td>
                     <td>
                       <div className="row-actions">
-                        <button className="btn icon-only" title="Editar agendamento" onClick={() => openEdit(a)}>
-                          <Pencil size={15} />
+                        <button className="btn icon-only" title={canEditAppointments ? "Editar agendamento" : "Visualizar agendamento"} onClick={() => openEdit(a)}>
+                          {canEditAppointments ? <Pencil size={15} /> : <Eye size={15} />}
                         </button>
                         {canDeleteAppointments && (
                           <button className="btn icon-only danger ghost" title="Excluir agendamento" onClick={() => openEdit(a)}>
@@ -169,6 +213,9 @@ export default function Dashboard() {
                     </td>
                   </tr>
                 ))}
+              {filtered.length === 0 && (
+                <tr><td colSpan={7}><div className="empty compact-empty">Nenhum agendamento encontrado com os filtros selecionados.</div></td></tr>
+              )}
             </tbody>
           </table>
         </div>
@@ -190,6 +237,9 @@ export default function Dashboard() {
     if (tab === "vtcall") return <VTCallPage />;
 
     if (tab === "logs") {
+      if (currentProfile.role !== "admin") {
+        return <div className="panel"><div className="empty">Apenas administradores podem consultar os logs.</div></div>;
+      }
       return (
         <div className="panel">
           <div className="panel-head">
@@ -214,7 +264,7 @@ export default function Dashboard() {
                     <td>{l.createdAt?.toDate ? format(l.createdAt.toDate(), "dd/MM/yyyy HH:mm") : "—"}</td>
                     <td>{l.userName || l.userEmail || "Sistema"}</td>
                     <td>{actions[l.action] || l.action}</td>
-                    <td>{l.details?.plate || l.targetId || "—"}</td>
+                    <td>{l.details?.fullName || l.details?.plate || l.details?.phone || l.targetId || "—"}</td>
                   </tr>
                 ))}
               </tbody>
@@ -242,16 +292,24 @@ export default function Dashboard() {
           </div>
 
           <div className="quick-actions">
-            <button onClick={() => setModal({})}>
-              <span className="quick-icon"><CalendarCheck2 size={21} /></span>
-              <span><strong>Novo agendamento</strong><small>Criar um horário</small></span>
-              <Plus size={17} />
-            </button>
-            <div className="quick-disabled">
+            {canEditAppointments ? (
+              <button onClick={() => setModal({})}>
+                <span className="quick-icon"><CalendarCheck2 size={21} /></span>
+                <span><strong>Novo agendamento</strong><small>Criar um horário</small></span>
+                <Plus size={17} />
+              </button>
+            ) : (
+              <div className="quick-disabled">
+                <span className="quick-icon"><CalendarCheck2 size={21} /></span>
+                <span><strong>Agenda</strong><small>Perfil somente consulta</small></span>
+                <em>Consulta</em>
+              </div>
+            )}
+            <button onClick={() => setTab("vtcall")}>
               <span className="quick-icon"><PhoneCall size={21} /></span>
-              <span><strong>Ligação VTCall</strong><small>Integração futura</small></span>
-              <em>Em breve</em>
-            </div>
+              <span><strong>VTCall</strong><small>Ramal e configuração</small></span>
+              <span className="quick-ready">Ativo</span>
+            </button>
             <div className="quick-disabled">
               <span className="quick-icon"><FileText size={21} /></span>
               <span><strong>Coleta de relato</strong><small>Fluxo em evolução</small></span>
@@ -277,7 +335,7 @@ export default function Dashboard() {
               <button className="btn" onClick={() => setWeekOffset((v) => v - 1)}>Anterior</button>
               <button className="btn" onClick={() => setWeekOffset(0)}>Hoje</button>
               <button className="btn" onClick={() => setWeekOffset((v) => v + 1)}>Próxima</button>
-              <button className="btn primary" onClick={() => setModal({})}><Plus size={16} /> Novo</button>
+              {canEditAppointments && <button className="btn primary" onClick={() => setModal({})}><Plus size={16} /> Novo</button>}
             </div>
           </div>
 
@@ -300,7 +358,7 @@ export default function Dashboard() {
                     const date = format(d, "yyyy-MM-dd");
                     const items = appointments.filter((a) => a.date === date && a.time === h);
                     return (
-                      <div className="cal-cell" key={date + h} onDoubleClick={() => setModal({ date, time: h })}>
+                      <div className="cal-cell" key={date + h} onDoubleClick={() => canEditAppointments && setModal({ date, time: h })}>
                         {items.map((a) => (
                           <div key={a.id} className={`appointment-card ${a.status}`} onClick={() => openEdit(a)}>
                             <div className="appointment-time">{a.time}</div>
@@ -335,7 +393,7 @@ export default function Dashboard() {
           <button className={tab === "agenda" ? "active" : ""} onClick={() => setTab("agenda")}><CalendarDays size={18} /> Agenda</button>
           <button className={tab === "agendamentos" ? "active" : ""} onClick={() => setTab("agendamentos")}><ClipboardList size={18} /> Agendamentos</button>
           {currentProfile.role === "admin" && <button className={tab === "usuarios" ? "active" : ""} onClick={() => setTab("usuarios")}><Users size={18} /> Usuários</button>}
-          <button className={tab === "logs" ? "active" : ""} onClick={() => setTab("logs")}><History size={18} /> Logs</button>
+          {currentProfile.role === "admin" && <button className={tab === "logs" ? "active" : ""} onClick={() => setTab("logs")}><History size={18} /> Logs</button>}
           <button className={tab === "perfil" ? "active" : ""} onClick={() => setTab("perfil")}><UserRound size={18} /> Meu perfil</button>
           <button className={tab === "vtcall" ? "active" : ""} onClick={() => setTab("vtcall")}><PhoneCall size={18} /> VTCall</button>
         </div>
@@ -385,7 +443,7 @@ export default function Dashboard() {
         {renderBody()}
       </main>
 
-      {modal && <AppointmentModal initial={modal.item} defaultDate={modal.date} defaultTime={modal.time} onClose={() => setModal(null)} onSaved={() => {}} />}
+      {modal && <AppointmentModal initial={modal.item} defaultDate={modal.date} defaultTime={modal.time} existingAppointments={appointments} readOnly={!canEditAppointments} onClose={() => setModal(null)} onSaved={() => {}} />}
     </div>
   );
 }
