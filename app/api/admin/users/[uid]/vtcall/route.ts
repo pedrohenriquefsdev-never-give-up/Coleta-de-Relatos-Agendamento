@@ -2,7 +2,8 @@ import { NextRequest } from "next/server";
 import { FieldValue } from "firebase-admin/firestore";
 import { adminDb } from "@/lib/firebase-admin";
 import { encryptSecret, decryptSecret } from "@/lib/vtcall-crypto";
-import { requireAdmin } from "@/lib/server-auth";
+import { isDeveloper, requireAdmin } from "@/lib/server-auth";
+import { isPortalDeveloperUid } from "@/lib/access-control";
 import { safeServerError } from "@/lib/server-error";
 
 export const runtime = "nodejs";
@@ -20,8 +21,9 @@ function clean(body: any) {
 
 export async function GET(req: NextRequest, { params }: { params: Promise<{ uid: string }> }) {
   try {
-    await requireAdmin(req);
+    const actor = await requireAdmin(req);
     const { uid } = await params;
+    if (isPortalDeveloperUid(uid) && actor.uid !== uid) return Response.json({ error: "O acesso do Desenvolvedor é protegido." }, { status: 403 });
     const snap = await adminDb().collection("vtcallCredentials").doc(uid).get();
     if (!snap.exists) return Response.json({ configured: false, host: "", extension: "", password: "", port: 5068, transport: "UDP" });
     const data = snap.data() || {};
@@ -43,6 +45,7 @@ export async function PUT(req: NextRequest, { params }: { params: Promise<{ uid:
   try {
     const actor = await requireAdmin(req);
     const { uid } = await params;
+    if (isPortalDeveloperUid(uid) && actor.uid !== uid) return Response.json({ error: "O acesso do Desenvolvedor é protegido." }, { status: 403 });
     const body = await req.json();
     const value = clean(body);
     if (!value.password) return Response.json({ error: "Informe a senha do ramal." }, { status: 400 });
@@ -65,7 +68,7 @@ export async function PUT(req: NextRequest, { params }: { params: Promise<{ uid:
 
     adminDb().collection("auditLogs").add({
       userId: actor.uid,
-      userName: actor.name || actor.email || "Administrador",
+      userName: actor.name || actor.email || (isDeveloper(actor) ? "Desenvolvedor" : "Administrador"),
       userEmail: actor.email || "",
       action: "VTCALL_CREDENTIALS_UPDATED",
       targetId: uid,

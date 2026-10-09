@@ -25,6 +25,7 @@ import {
 import { useEffect, useMemo, useState } from "react";
 import { db } from "@/lib/firebase";
 import type { AppUser, Appointment } from "@/lib/types";
+import { effectiveRole, isManagementRole } from "@/lib/access-control";
 import { useSession } from "./AuthGate";
 import AppointmentModal from "./AppointmentModal";
 import Plate from "./Plate";
@@ -61,6 +62,7 @@ const actions: Record<string, string> = {
   USER_CREATED: "Criou usuário",
   USER_UPDATED: "Alterou usuário",
   PROFILE_PHOTO_UPDATED: "Atualizou foto do perfil",
+  USER_PHOTO_UPDATED_BY_DEVELOPER: "Desenvolvedor alterou foto de usuário",
   VTCALL_CREDENTIALS_UPDATED: "Atualizou configuração VTCall",
   VTCALL_CALL_REQUESTED: "Solicitou ligação VTCall",
 };
@@ -107,12 +109,12 @@ export default function Dashboard() {
 
   useEffect(() => {
     return onSnapshot(query(collection(db, "users"), orderBy("name")), (snapshot) => {
-      setUsers(snapshot.docs.map((docSnap) => ({ uid: docSnap.id, ...docSnap.data() } as AppUser)));
+      setUsers(snapshot.docs.map((docSnap) => { const raw = { uid: docSnap.id, ...docSnap.data() } as AppUser; return { ...raw, role: effectiveRole(raw.uid, raw.role) }; }));
     });
   }, []);
 
   useEffect(() => {
-    if (!profile || profile.role !== "admin") {
+    if (!profile || !isManagementRole(profile.role)) {
       setLogs([]);
       return;
     }
@@ -141,8 +143,8 @@ export default function Dashboard() {
 
   if (!profile) return <div className="loading"><div className="spinner" /></div>;
   const currentProfile = profile;
-  const canDeleteAppointments = currentProfile.role === "admin";
-  const canEditAppointments = currentProfile.role === "admin" || currentProfile.role === "atendente";
+  const canDeleteAppointments = currentProfile.role === "desenvolvedor" || currentProfile.role === "admin";
+  const canEditAppointments = currentProfile.role === "desenvolvedor" || currentProfile.role === "admin" || currentProfile.role === "atendente";
 
   function openEdit(appointment: Appointment) {
     setModal({ item: appointment });
@@ -174,7 +176,7 @@ export default function Dashboard() {
             </select>
             <select className="select table-filter" value={responsibleFilter} onChange={(e) => setResponsibleFilter(e.target.value)}>
               <option value="todos">Todos os responsáveis</option>
-              {users.filter((u) => u.active && (u.role === "admin" || u.role === "atendente")).map((u) => (
+              {users.filter((u) => u.active && (u.role === "desenvolvedor" || u.role === "admin" || u.role === "atendente")).map((u) => (
                 <option key={u.uid} value={u.uid}>{u.name}</option>
               ))}
             </select>
@@ -242,10 +244,10 @@ export default function Dashboard() {
 
   function renderBody() {
     if (tab === "usuarios") {
-      return currentProfile.role === "admin" ? (
+      return isManagementRole(currentProfile.role) ? (
         <UserManager />
       ) : (
-        <div className="panel"><div className="empty">Apenas administradores podem gerenciar usuários.</div></div>
+        <div className="panel"><div className="empty">Somente o Desenvolvedor e administradores podem gerenciar usuários.</div></div>
       );
     }
 
@@ -254,8 +256,8 @@ export default function Dashboard() {
     if (tab === "vtcall") return <VTCallPage />;
 
     if (tab === "logs") {
-      if (currentProfile.role !== "admin") {
-        return <div className="panel"><div className="empty">Apenas administradores podem consultar os logs.</div></div>;
+      if (!isManagementRole(currentProfile.role)) {
+        return <div className="panel"><div className="empty">Somente o Desenvolvedor e administradores podem consultar os logs.</div></div>;
       }
       return (
         <div className="panel">
@@ -417,8 +419,8 @@ export default function Dashboard() {
         <div className="nav">
           <button className={tab === "agenda" ? "active" : ""} onClick={() => setTab("agenda")}><CalendarDays size={18} /> Agenda</button>
           <button className={tab === "agendamentos" ? "active" : ""} onClick={() => setTab("agendamentos")}><ClipboardList size={18} /> Agendamentos</button>
-          {currentProfile.role === "admin" && <button className={tab === "usuarios" ? "active" : ""} onClick={() => setTab("usuarios")}><Users size={18} /> Usuários</button>}
-          {currentProfile.role === "admin" && <button className={tab === "logs" ? "active" : ""} onClick={() => setTab("logs")}><History size={18} /> Logs</button>}
+          {isManagementRole(currentProfile.role) && <button className={tab === "usuarios" ? "active" : ""} onClick={() => setTab("usuarios")}><Users size={18} /> Usuários</button>}
+          {isManagementRole(currentProfile.role) && <button className={tab === "logs" ? "active" : ""} onClick={() => setTab("logs")}><History size={18} /> Logs</button>}
           <button className={tab === "perfil" ? "active" : ""} onClick={() => setTab("perfil")}><UserRound size={18} /> Meu perfil</button>
           <button className={tab === "vtcall" ? "active" : ""} onClick={() => setTab("vtcall")}><PhoneCall size={18} /> VTCall</button>
         </div>
@@ -437,7 +439,7 @@ export default function Dashboard() {
           <div className="sidebar-session">
             <div>
               <small>Sessão ativa</small>
-              <strong>{currentProfile.role}</strong>
+              <strong>{currentProfile.role === "desenvolvedor" ? "Desenvolvedor" : currentProfile.role}</strong>
             </div>
             <button className="icon-btn sidebar-logout" onClick={logout} title="Sair">
               <LogOut size={16} />
@@ -459,7 +461,7 @@ export default function Dashboard() {
               {currentProfile.photoUrl ? <img className="avatar" src={currentProfile.photoUrl} alt="" /> : <div className="avatar">{currentProfile.name?.[0]}</div>}
               <span>
                 <strong>{currentProfile.name}</strong>
-                <small>{currentProfile.role}</small>
+                <small>{currentProfile.role === "desenvolvedor" ? "Desenvolvedor" : currentProfile.role}</small>
               </span>
             </button>
           </div>

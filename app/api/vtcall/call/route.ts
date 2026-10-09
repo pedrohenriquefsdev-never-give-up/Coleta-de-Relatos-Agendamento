@@ -5,6 +5,7 @@ import { adminDb } from "@/lib/firebase-admin";
 import { requireUser } from "@/lib/server-auth";
 import { safeServerError } from "@/lib/server-error";
 import { readShowpeer } from "@/lib/vtcall-showpeer";
+import { isPortalDeveloperUid } from "@/lib/access-control";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -16,7 +17,7 @@ const cleanPhone = (v: string) => String(v || "").replace(/\D/g, "");
 export async function POST(req: NextRequest) {
   try {
     const user = await requireUser(req);
-    if (user.role !== "admin" && user.role !== "atendente") {
+    if (user.role !== "admin" && user.role !== "atendente" && !isPortalDeveloperUid(user.uid)) {
       return Response.json({ error: "Seu perfil possui acesso somente para consulta." }, { status: 403 });
     }
     const body = await req.json();

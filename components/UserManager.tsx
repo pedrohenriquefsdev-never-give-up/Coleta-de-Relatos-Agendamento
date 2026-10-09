@@ -1,10 +1,12 @@
 "use client";
 
 import { collection, onSnapshot, orderBy, query } from "firebase/firestore";
-import { BriefcaseBusiness, KeyRound, Pencil, PhoneCall, Plus, ServerCog, UserCheck, UserX } from "lucide-react";
-import { useEffect, useState } from "react";
+import { BriefcaseBusiness, Camera, KeyRound, LockKeyhole, Pencil, PhoneCall, Plus, ServerCog, UserCheck, UserX } from "lucide-react";
+import { type ChangeEvent, useEffect, useState } from "react";
 import { auth, db } from "@/lib/firebase";
 import type { AppUser, UserRole } from "@/lib/types";
+import { effectiveRole, isPortalDeveloperUid } from "@/lib/access-control";
+import { useSession } from "./AuthGate";
 import Modal from "./Modal";
 
 const DEPARTMENTS = ["Atendimento", "Cadastro", "Comercial", "Operação", "Rastreamento", "Administrativo", "Marketing"];
@@ -21,6 +23,8 @@ async function readJsonSafe(res: Response) {
 }
 
 export default function UserManager() {
+  const { profile } = useSession();
+  const currentIsDeveloper = profile?.role === "desenvolvedor";
   const [users, setUsers] = useState<AppUser[]>([]);
   const [open, setOpen] = useState(false);
   const [editing, setEditing] = useState<AppUser | null>(null);
@@ -34,8 +38,10 @@ export default function UserManager() {
   const [form, setForm] = useState({ name: "", email: "", cpf: "", role: "atendente" as UserRole, department: "Atendimento" });
   const [vtcall, setVtcall] = useState(DEFAULT_VTCALL);
   const [editCpf, setEditCpf] = useState("");
+  const [photoLoading, setPhotoLoading] = useState(false);
+  const [photoMessage, setPhotoMessage] = useState("");
 
-  useEffect(() => onSnapshot(query(collection(db, "users"), orderBy("name")), (s) => setUsers(s.docs.map((d) => ({ uid: d.id, ...d.data() } as AppUser)))), []);
+  useEffect(() => onSnapshot(query(collection(db, "users"), orderBy("name")), (s) => setUsers(s.docs.map((d) => { const raw = { uid: d.id, ...d.data() } as AppUser; return { ...raw, role: effectiveRole(raw.uid, raw.role) }; }))), []);
 
   async function token() { return await auth.currentUser?.getIdToken(); }
   const finalDepartment = form.department === "__outro__" ? otherDepartment.trim() : form.department;
@@ -77,16 +83,22 @@ export default function UserManager() {
   }
 
   async function toggle(u: AppUser) {
+    if (isPortalDeveloperUid(u.uid)) return alert("O acesso do Desenvolvedor é protegido e não pode ser bloqueado.");
     const res = await fetch(`/api/admin/users/${u.uid}`, {
       method: "PATCH",
       headers: { "Content-Type": "application/json", Authorization: `Bearer ${await token()}` },
       body: JSON.stringify({ active: !u.active }),
     });
-    if (!res.ok) alert("Não foi possível alterar o acesso.");
+    const data = await readJsonSafe(res);
+    if (!res.ok) alert(data.error || "Não foi possível alterar o acesso.");
   }
 
   async function openEdit(u: AppUser) {
+    if (isPortalDeveloperUid(u.uid) && !currentIsDeveloper) {
+      return alert("Este acesso é protegido e só pode ser alterado pelo próprio Desenvolvedor.");
+    }
     setError("");
+    setPhotoMessage("");
     setEditing({ ...u, department: u.department || "Atendimento" });
     setOtherDepartment("");
     setVtcall(DEFAULT_VTCALL);
@@ -112,7 +124,8 @@ export default function UserManager() {
     if (wantsVTCall && (!vtcall.extension || !vtcall.password)) return setError("Preencha o ramal e a senha do VTCall.");
     setLoading(true); setError("");
     try {
-      const payload: Record<string, unknown> = { name, email, role: editing.role, department };
+      const payload: Record<string, unknown> = { name, email, department };
+      if (!isPortalDeveloperUid(editing.uid)) payload.role = editing.role;
       if (cpf) payload.cpf = cpf;
       const res = await fetch(`/api/admin/users/${editing.uid}`, {
         method: "PATCH",
@@ -133,6 +146,35 @@ export default function UserManager() {
     finally { setLoading(false); }
   }
 
+
+  async function changeEditingPhoto(e: ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0];
+    if (!file || !editing) return;
+    e.target.value = "";
+    if (!currentIsDeveloper) return setPhotoMessage("Somente o Desenvolvedor pode alterar a foto de outros usuários.");
+    if (file.size > 5 * 1024 * 1024) return setPhotoMessage("A imagem deve ter no máximo 5 MB.");
+
+    setPhotoLoading(true);
+    setPhotoMessage("");
+    try {
+      const body = new FormData();
+      body.append("file", file);
+      body.append("targetUid", editing.uid);
+      const res = await fetch("/api/cloudinary-upload", {
+        method: "POST",
+        headers: { Authorization: `Bearer ${await token()}` },
+        body,
+      });
+      const data = await readJsonSafe(res);
+      if (!res.ok || !data.url) throw new Error(data.error || `Não foi possível atualizar a foto (HTTP ${res.status}).`);
+      setEditing({ ...editing, photoUrl: data.url });
+      setPhotoMessage("Foto atualizada com sucesso.");
+    } catch (e) {
+      setPhotoMessage(e instanceof Error ? e.message : "Não foi possível atualizar a foto.");
+    } finally {
+      setPhotoLoading(false);
+    }
+  }
 
   async function runDiagnostic() {
     setDiagOpen(true);
@@ -179,8 +221,8 @@ export default function UserManager() {
           <td>{u.email}</td>
           <td><span className="department-chip"><BriefcaseBusiness size={13}/>{u.department||"Não informado"}</span></td>
           <td>{u.vtcallConfigured?<span className="department-chip"><PhoneCall size={13}/>{u.vtcallExtension||"Configurado"}</span>:<span className="pill">Não configurado</span>}</td>
-          <td><span className={`pill ${u.role}`}>{u.role}</span></td><td><span className={`pill ${u.active?"active":""}`}>{u.active?"Ativo":"Bloqueado"}</span></td>
-          <td><div className="row-actions"><button className="btn icon-only" title="Editar usuário e VTCall" onClick={()=>openEdit(u)}><Pencil size={15}/></button><button className="btn" onClick={()=>toggle(u)}>{u.active?<><UserX size={15}/> Bloquear</>:<><UserCheck size={15}/> Ativar</>}</button></div></td>
+          <td><span className={`pill ${u.role}`}>{u.role === "desenvolvedor" ? "Desenvolvedor" : u.role}</span></td><td><span className={`pill ${u.active?"active":""}`}>{u.active?"Ativo":"Bloqueado"}</span></td>
+          <td>{isPortalDeveloperUid(u.uid) && !currentIsDeveloper ? <span className="protected-access"><LockKeyhole size={14}/> Acesso protegido</span> : <div className="row-actions"><button className="btn icon-only" title="Editar usuário e VTCall" onClick={()=>openEdit(u)}><Pencil size={15}/></button>{isPortalDeveloperUid(u.uid)?<span className="protected-access"><LockKeyhole size={14}/> Protegido</span>:<button className="btn" onClick={()=>toggle(u)}>{u.active?<><UserX size={15}/> Bloquear</>:<><UserCheck size={15}/> Ativar</>}</button>}</div>}</td>
         </tr>)}
       </tbody></table></div>
     </div>
@@ -222,15 +264,20 @@ export default function UserManager() {
 
     {editing&&<Modal title={`Editar usuário • ${editing.name}`} onClose={()=>{setEditing(null);setEditCpf("")}} footer={<><button className="btn" onClick={()=>{setEditing(null);setEditCpf("")}}>Cancelar</button><button className="btn primary" onClick={saveEditing} disabled={loading||loadingVT}>{loading?"Salvando...":"Salvar alterações"}</button></>}>
       <div className="stack">{error&&<div className="error">{error}</div>}{loadingVT&&<div className="info-note"><KeyRound size={16}/><span>Carregando configuração segura do VTCall...</span></div>}
+        {currentIsDeveloper&&<div className="admin-photo-editor">
+          <div className="admin-photo-preview">{editing.photoUrl?<img src={editing.photoUrl} alt={`Foto de ${editing.name}`}/>:<span>{editing.name?.[0]||"U"}</span>}</div>
+          <div className="admin-photo-copy"><strong>Foto de perfil</strong><small>Como Desenvolvedor, você pode substituir a foto deste usuário.</small>{photoMessage&&<em className={photoMessage.includes("sucesso")?"photo-success":"photo-error"}>{photoMessage}</em>}</div>
+          <label className="btn"><Camera size={15}/>{photoLoading?"Enviando...":"Alterar foto"}<input type="file" hidden accept="image/jpeg,image/png,image/webp" disabled={photoLoading} onChange={changeEditingPhoto}/></label>
+        </div>}
         <div className="field"><label>Nome completo</label><input className="input" value={editing.name||""} onChange={(e)=>setEditing({...editing,name:e.target.value})}/></div>
         <div className="field"><label>E-mail de acesso</label><input className="input" type="email" value={editing.email||""} onChange={(e)=>setEditing({...editing,email:e.target.value})}/><small style={{color:"#777"}}>Ao alterar o e-mail, o novo endereço passa a ser usado no próximo login.</small></div>
         <div className="field"><label>Novo CPF / redefinir senha</label><input className="input" inputMode="numeric" value={editCpf} onChange={(e)=>setEditCpf(e.target.value.replace(/\D/g,"").slice(0,11))} placeholder="Deixe em branco para manter a senha atual"/><small style={{color:"#777"}}>Preencha apenas se quiser redefinir a senha de acesso para um novo CPF. O CPF não é salvo em texto puro.</small></div>
         <div className="grid-2">
           <div className="field"><label>Departamento</label><select className="select" value={DEPARTMENTS.includes(editing.department||"")?editing.department:"__outro__"} onChange={(e)=>{if(e.target.value==="__outro__"){setOtherDepartment(DEPARTMENTS.includes(editing.department||"")?"":(editing.department||""));setEditing({...editing,department:"__outro__"})}else{setOtherDepartment("");setEditing({...editing,department:e.target.value})}}}>{DEPARTMENTS.map((d)=><option key={d}>{d}</option>)}<option value="__outro__">Outro</option></select></div>
-          <div className="field"><label>Perfil de acesso</label><select className="select" value={editing.role} disabled={editing.uid===auth.currentUser?.uid} onChange={(e)=>setEditing({...editing,role:e.target.value as UserRole})}><option value="admin">Administrador</option><option value="atendente">Atendente</option><option value="consulta">Consulta</option></select></div>
+          <div className="field"><label>Perfil de acesso</label><select className="select" value={editing.role} disabled={isPortalDeveloperUid(editing.uid) || (editing.uid===auth.currentUser?.uid && !currentIsDeveloper)} onChange={(e)=>setEditing({...editing,role:e.target.value as UserRole})}>{isPortalDeveloperUid(editing.uid)&&<option value="desenvolvedor">Desenvolvedor</option>}<option value="admin">Administrador</option><option value="atendente">Atendente</option><option value="consulta">Consulta</option></select></div>
         </div>
         {editing.department==="__outro__"&&<div className="field"><label>Nome do departamento</label><input className="input" value={otherDepartment} onChange={(e)=>setOtherDepartment(e.target.value)}/></div>}
-        {editing.uid===auth.currentUser?.uid&&<div className="info-note"><KeyRound size={16}/><span>Por segurança, você não pode remover seu próprio perfil de administrador por esta tela.</span></div>}
+        {isPortalDeveloperUid(editing.uid)?<div className="developer-note"><LockKeyhole size={16}/><span>Perfil Desenvolvedor exclusivo. O nível de acesso não pode ser alterado, bloqueado ou atribuído a outra conta.</span></div>:editing.uid===auth.currentUser?.uid&&<div className="info-note"><KeyRound size={16}/><span>Por segurança, você não pode remover seu próprio perfil de administrador por esta tela.</span></div>}
         <VtFields/>
       </div>
     </Modal>}

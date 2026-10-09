@@ -1,4 +1,4 @@
-# Portal Coleta de Relatos — V1.1
+# Portal Coleta de Relatos — V1.39.3
 
 Portal interno para agenda, gestão de acessos, auditoria e futura integração com VTCall.
 
@@ -79,3 +79,13 @@ Depois de alterar Environment Variables, faça um novo deploy.
 - Responsável por agendamento.
 - Conflito apenas quando o mesmo responsável tem horários sobrepostos.
 - Contagem diária na agenda e filtro por responsável.
+
+
+## V1.39.3 — Nível Desenvolvedor
+- Novo nível exclusivo **Desenvolvedor** para a conta técnica principal do portal.
+- O Desenvolvedor mantém acesso total a agenda, usuários, logs, VTCall e configurações.
+- Administradores não podem editar, bloquear, redefinir senha, alterar VTCall ou modificar o acesso do Desenvolvedor.
+- O nível Desenvolvedor não aparece como opção ao criar ou promover outros usuários.
+- O Desenvolvedor pode substituir a foto de perfil de qualquer usuário diretamente pela tela de edição.
+- Alterações de foto feitas pelo Desenvolvedor são registradas na auditoria.
+- Regras do Firestore reforçadas para proteger o cadastro técnico também contra alterações diretas pelo cliente.

@@ -95,10 +95,10 @@ export default function AppointmentModal({
   });
 
   const title = useMemo(() => (initial ? `Agendamento • ${initial.plate}` : "Novo agendamento"), [initial]);
-  const canDelete = !!initial && !readOnly && profile?.role === "admin";
+  const canDelete = !!initial && !readOnly && (profile?.role === "desenvolvedor" || profile?.role === "admin");
 
   const operationalUsers = useMemo(
-    () => availableUsers.filter((item) => item.active && (item.role === "admin" || item.role === "atendente")),
+    () => availableUsers.filter((item) => item.active && (item.role === "desenvolvedor" || item.role === "admin" || item.role === "atendente")),
     [availableUsers],
   );
 

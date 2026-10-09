@@ -1,5 +1,6 @@
 import { NextRequest } from "next/server";
 import { adminAuth, adminDb } from "@/lib/firebase-admin";
+import { isPortalDeveloperUid } from "@/lib/access-control";
 
 export async function requireUser(req: NextRequest) {
   const h = req.headers.get("authorization");
@@ -10,8 +11,18 @@ export async function requireUser(req: NextRequest) {
   return { uid: decoded.uid, ...snap.data() } as any;
 }
 
+export function isDeveloper(user: { uid?: string; role?: string } | null | undefined) {
+  return Boolean(user && isPortalDeveloperUid(user.uid));
+}
+
 export async function requireAdmin(req: NextRequest) {
   const user = await requireUser(req);
-  if (user.role !== "admin") throw new Error("FORBIDDEN");
+  if (!isDeveloper(user) && user.role !== "admin") throw new Error("FORBIDDEN");
+  return user;
+}
+
+export async function requireDeveloper(req: NextRequest) {
+  const user = await requireUser(req);
+  if (!isPortalDeveloperUid(user.uid)) throw new Error("FORBIDDEN");
   return user;
 }

@@ -4,31 +4,36 @@ service cloud.firestore {
     function signedIn() { return request.auth != null; }
     function userDoc() { return get(/databases/$(database)/documents/users/$(request.auth.uid)); }
     function active() { return signedIn() && userDoc().data.active == true; }
+    function developer() { return active() && request.auth.uid == 'PBH5b5zU3EQuQYigKWGe8MTlQis2'; }
     function admin() { return active() && userDoc().data.role == 'admin'; }
-    function canEdit() { return active() && (userDoc().data.role == 'admin' || userDoc().data.role == 'atendente'); }
+    function management() { return developer() || admin(); }
+    function canEdit() { return developer() || (active() && (userDoc().data.role == 'admin' || userDoc().data.role == 'atendente')); }
+    function protectedDeveloper(uid) { return uid == 'PBH5b5zU3EQuQYigKWGe8MTlQis2'; }
 
     match /users/{uid} {
       allow read: if active();
       allow create, delete: if false; // somente Firebase Admin SDK
-      allow update: if admin() || (active() && request.auth.uid == uid &&
-        request.resource.data.diff(resource.data).affectedKeys().hasOnly(['photoUrl','updatedAt','lastAccessAt']));
+      allow update: if developer()
+        || (admin() && !protectedDeveloper(uid) && request.resource.data.role != 'desenvolvedor')
+        || (active() && request.auth.uid == uid &&
+          request.resource.data.diff(resource.data).affectedKeys().hasOnly(['photoUrl','updatedAt','lastAccessAt']));
     }
 
     match /appointments/{id} {
       allow read: if active();
       allow create, update: if canEdit();
-      allow delete: if admin();
+      allow delete: if management();
     }
 
     match /auditLogs/{id} {
-      allow read: if admin();
+      allow read: if management();
       allow create: if active() && request.resource.data.userId == request.auth.uid;
       allow update, delete: if false;
     }
 
     match /settings/{id} {
       allow read: if active();
-      allow write: if admin();
+      allow write: if management();
     }
   }
 }

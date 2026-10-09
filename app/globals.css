@@ -1887,3 +1887,72 @@
 .day-appointment-count{display:inline-flex;margin-top:5px;padding:3px 6px;border-radius:999px;background:rgba(244,196,0,.11);color:#a88700;font-size:8px;font-weight:850;text-transform:none}
 .appointment-responsible{display:block;color:var(--text)!important;font-size:8.5px;font-weight:750;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .cal-cell{display:grid;align-content:start;gap:5px}
+
+
+/* V1.39.3 — perfil Desenvolvedor e gestão de fotos */
+.pill.desenvolvedor{
+  background:rgba(244,196,0,.2);
+  color:#b28b00;
+  border:1px solid rgba(244,196,0,.24);
+  font-weight:900;
+}
+.protected-access{
+  display:inline-flex;
+  align-items:center;
+  gap:6px;
+  padding:7px 9px;
+  border:1px solid var(--line);
+  border-radius:10px;
+  color:var(--muted);
+  background:var(--surface-2);
+  font-size:10px;
+  font-weight:750;
+  white-space:nowrap;
+}
+.admin-photo-editor{
+  display:grid;
+  grid-template-columns:58px minmax(0,1fr) auto;
+  align-items:center;
+  gap:13px;
+  padding:13px;
+  border:1px solid var(--line);
+  border-radius:15px;
+  background:var(--surface-2);
+}
+.admin-photo-preview{
+  width:58px;
+  height:58px;
+  border-radius:15px;
+  overflow:hidden;
+  display:grid;
+  place-items:center;
+  background:var(--surface-3);
+  border:1px solid var(--line);
+  font-size:20px;
+  font-weight:900;
+}
+.admin-photo-preview img{width:100%;height:100%;object-fit:cover;display:block}
+.admin-photo-copy{min-width:0;display:flex;flex-direction:column;gap:3px}
+.admin-photo-copy strong{font-size:12px}
+.admin-photo-copy small{font-size:10px;color:var(--muted);line-height:1.4}
+.admin-photo-copy em{font-size:10px;font-style:normal;margin-top:2px}
+.admin-photo-copy .photo-success{color:var(--success)}
+.admin-photo-copy .photo-error{color:var(--danger)}
+.developer-note{
+  display:flex;
+  align-items:flex-start;
+  gap:8px;
+  padding:11px 12px;
+  border:1px solid rgba(244,196,0,.25);
+  background:rgba(244,196,0,.08);
+  color:var(--text);
+  border-radius:12px;
+  font-size:11px;
+  line-height:1.45;
+}
+.developer-note svg{color:var(--yellow);flex:0 0 auto;margin-top:1px}
+@media(max-width:700px){
+  .admin-photo-editor{grid-template-columns:52px 1fr}
+  .admin-photo-editor>.btn{grid-column:1/-1;justify-self:stretch}
+  .admin-photo-preview{width:52px;height:52px}
+}

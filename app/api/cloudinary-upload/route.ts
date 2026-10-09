@@ -1,18 +1,14 @@
 import { runtimeEnv } from "@/lib/runtime-env";
 import { createHash } from "node:crypto";
 import { NextRequest } from "next/server";
-import { adminAuth, adminDb } from "@/lib/firebase-admin";
+import { adminDb } from "@/lib/firebase-admin";
+import { isDeveloper, requireUser } from "@/lib/server-auth";
 
 export const runtime = "nodejs";
 
 export async function POST(req: NextRequest) {
   try {
-    const header = req.headers.get("authorization");
-    if (!header?.startsWith("Bearer ")) return Response.json({ error: "Não autorizado" }, { status: 401 });
-
-    const decoded = await adminAuth().verifyIdToken(header.slice(7));
-    const user = await adminDb().collection("users").doc(decoded.uid).get();
-    if (!user.exists || user.data()?.active === false) return Response.json({ error: "Acesso bloqueado" }, { status: 403 });
+    const actor = await requireUser(req);
 
     const cloudName = runtimeEnv("CLOUDINARY_CLOUD_NAME").trim();
     const apiKey = runtimeEnv("CLOUDINARY_API_KEY").trim();
@@ -26,13 +22,24 @@ export async function POST(req: NextRequest) {
 
     const data = await req.formData();
     const file = data.get("file");
+    const requestedTargetUid = String(data.get("targetUid") || "").trim();
+    const targetUid = requestedTargetUid || actor.uid;
+
+    // Todos podem trocar a própria foto. Somente o Desenvolvedor pode trocar a foto de outra conta.
+    if (targetUid !== actor.uid && !isDeveloper(actor)) {
+      return Response.json({ error: "Somente o Desenvolvedor pode alterar a foto de outro usuário." }, { status: 403 });
+    }
+
+    const targetSnap = await adminDb().collection("users").doc(targetUid).get();
+    if (!targetSnap.exists) return Response.json({ error: "Usuário não encontrado." }, { status: 404 });
+
     if (!(file instanceof File)) return Response.json({ error: "Arquivo inválido" }, { status: 400 });
     if (file.size > 5 * 1024 * 1024) return Response.json({ error: "A imagem deve ter no máximo 5 MB." }, { status: 400 });
     if (!file.type.startsWith("image/")) return Response.json({ error: "Envie um arquivo de imagem." }, { status: 400 });
 
     const timestamp = Math.floor(Date.now() / 1000);
     const folder = "portal-coleta-relatos/perfis";
-    const publicId = `perfil_${decoded.uid}`;
+    const publicId = `perfil_${targetUid}`;
     const signatureBase = `folder=${folder}&overwrite=true&public_id=${publicId}&timestamp=${timestamp}${apiSecret}`;
     const signature = createHash("sha1").update(signatureBase).digest("hex");
 
@@ -49,32 +56,37 @@ export async function POST(req: NextRequest) {
     const payload = await response.json();
     if (!response.ok || !payload.secure_url) return Response.json({ error: payload.error?.message || "Falha no upload" }, { status: 500 });
 
-    await adminDb().collection("users").doc(decoded.uid).set({
+    await adminDb().collection("users").doc(targetUid).set({
       photoUrl: payload.secure_url,
       updatedAt: new Date(),
     }, { merge: true });
 
+    const target = targetSnap.data() || {};
     adminDb().collection("auditLogs").add({
-      userId: decoded.uid,
-      userName: user.data()?.name || user.data()?.email || "Usuário",
-      userEmail: user.data()?.email || "",
-      action: "PROFILE_PHOTO_UPDATED",
+      userId: actor.uid,
+      userName: actor.name || actor.email || "Usuário",
+      userEmail: actor.email || "",
+      action: targetUid === actor.uid ? "PROFILE_PHOTO_UPDATED" : "USER_PHOTO_UPDATED_BY_DEVELOPER",
+      targetId: targetUid,
+      details: targetUid === actor.uid ? {} : { targetUserName: target.name || target.email || targetUid },
       createdAt: new Date(),
     }).catch(() => undefined);
 
-    return Response.json({ ok: true, url: payload.secure_url });
+    return Response.json({ ok: true, url: payload.secure_url, targetUid });
   } catch (e: any) {
+    const status = e?.message === "UNAUTHORIZED" ? 401 : e?.message === "FORBIDDEN" ? 403 : 500;
     const message = String(e?.message || "");
     const error =
-      message.includes("Firebase Admin não configurado")
-        ? message
-        : message.includes("PRIVATE_KEY") || message.includes("private key") || message.includes("DECODER routines")
-          ? "A chave privada do Firebase Admin está inválida ou foi colada com formatação incorreta na Vercel."
-          : "Não foi possível enviar a imagem.";
+      status === 401 ? "Não autorizado" :
+      status === 403 ? "Acesso bloqueado" :
+      message.includes("Firebase Admin não configurado") ? message :
+      message.includes("PRIVATE_KEY") || message.includes("private key") || message.includes("DECODER routines")
+        ? "A chave privada do Firebase Admin está inválida ou foi colada com formatação incorreta na Vercel."
+        : "Não foi possível enviar a imagem.";
     return Response.json({
       error,
       code: e?.code || undefined,
-      technical: String(e?.message || "").slice(0, 400),
-    }, { status: 500 });
+      technical: status === 500 ? String(e?.message || "").slice(0, 400) : undefined,
+    }, { status });
   }
 }

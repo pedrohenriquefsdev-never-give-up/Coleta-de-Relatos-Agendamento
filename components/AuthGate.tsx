@@ -6,6 +6,7 @@ import { useRouter } from "next/navigation";
 import { createContext, useContext, useEffect, useState } from "react";
 import { auth, db } from "@/lib/firebase";
 import type { AppUser } from "@/lib/types";
+import { effectiveRole } from "@/lib/access-control";
 
 const AuthContext = createContext<{ user: User | null; profile: AppUser | null; logout: () => Promise<void> }>({ user: null, profile: null, logout: async () => {} });
 
@@ -48,7 +49,7 @@ export default function AuthGate({ children }: { children: React.ReactNode }) {
           return;
         }
 
-        setProfile({ ...data, uid: current.uid });
+        setProfile({ ...data, uid: current.uid, role: effectiveRole(current.uid, data.role) });
         setLoading(false);
       });
 

@@ -1,4 +1,4 @@
-export type UserRole = "admin" | "atendente" | "consulta";
+export type UserRole = "desenvolvedor" | "admin" | "atendente" | "consulta";
 export type AppointmentStatus =
   | "agendado"
   | "confirmado"
