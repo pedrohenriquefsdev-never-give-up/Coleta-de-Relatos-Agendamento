@@ -293,9 +293,9 @@ export default function AppointmentModal({
       setSgaPhotoTypes(photoTypes);
       if (events.length > 0 && eventData.resolution?.resolvedBy) {
         const vehicleCode = eventData.resolution?.vehicleCode ? ` • veículo SGA ${eventData.resolution.vehicleCode}` : "";
-        setSgaMessage(eventData.resolution.resolvedBy === "vehicle_code"
-          ? `Evento localizado pelo código interno do veículo${vehicleCode}.`
-          : "Evento localizado diretamente pela placa.");
+        setSgaMessage(eventData.resolution.resolvedBy === "vehicle_code_exact"
+          ? `Evento confirmado pelo código interno do veículo${vehicleCode}.`
+          : "Evento confirmado diretamente pela placa.");
       }
 
       if (!catalogData.checks?.photoTypes?.ok) {

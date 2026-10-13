@@ -3,7 +3,7 @@ import { FieldValue } from "firebase-admin/firestore";
 import { adminDb } from "@/lib/firebase-admin";
 import { requireUser, isDeveloper } from "@/lib/server-auth";
 import { safeServerError } from "@/lib/server-error";
-import { listSgaPhotoTypes, resolveSgaEventsByPlate, uploadSgaEventDocument } from "@/lib/sga-client";
+import { listSgaPhotoTypes, normalizeSgaPlate, resolveSgaEventsByPlate, uploadSgaEventDocument } from "@/lib/sga-client";
 import { loadCallHistoryData } from "@/lib/call-history-data";
 import { buildCallHistoryPdf } from "@/lib/call-history-pdf";
 
@@ -60,7 +60,14 @@ export async function POST(req: NextRequest) {
     const resolvedEvents = await resolveSgaEventsByPlate(plate);
     const events = eventArray(resolvedEvents.data);
     const selectedEvent = events.find((item) => String(item?.codigo_evento ?? "") === eventCode && String(item?.codigo_veiculo ?? "") === vehicleCode);
-    if (!selectedEvent) {
+    const selectedEventPlate = normalizeSgaPlate(selectedEvent?.placa);
+    const resolvedVehicleCode = String(resolvedEvents.vehicleCode || "").trim();
+    const eventStillMatchesPlate = Boolean(
+      selectedEvent &&
+      (!selectedEventPlate || selectedEventPlate === plate) &&
+      (!resolvedVehicleCode || resolvedVehicleCode === vehicleCode)
+    );
+    if (!eventStillMatchesPlate) {
       return Response.json({ error: "O evento selecionado não corresponde mais à placa deste agendamento. Consulte o SGA novamente." }, { status: 409 });
     }
 

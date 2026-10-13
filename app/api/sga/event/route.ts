@@ -27,9 +27,12 @@ export async function GET(req: NextRequest) {
     });
   } catch (e: any) {
     const technical = safeServerError(e);
-    const status = e?.message === "UNAUTHORIZED" ? 401 : e?.message === "FORBIDDEN" ? 403 : 502;
+    const exactNotFound = e?.code === "SGA_EXACT_EVENT_NOT_FOUND" || e?.code === "SGA_EXACT_VEHICLE_NOT_FOUND";
+    const status = e?.message === "UNAUTHORIZED" ? 401 : e?.message === "FORBIDDEN" ? 403 : exactNotFound ? 404 : 502;
     return Response.json({
-      error: "Não foi possível consultar o evento no SGA.",
+      error: exactNotFound
+        ? `Nenhum evento com correspondência exata para a placa ${e?.normalizedPlate || "informada"} foi localizado no SGA.`
+        : "Não foi possível consultar o evento no SGA.",
       technical: technical.message,
       resolution: {
         normalizedPlate: e?.normalizedPlate || null,

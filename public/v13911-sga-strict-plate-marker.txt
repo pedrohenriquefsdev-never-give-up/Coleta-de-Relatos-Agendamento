@@ -1,0 +1,1 @@
+V1.39.11 - strict exact plate matching for SGA vehicle/event resolution

@@ -102,6 +102,7 @@ function asArray(value: any): any[] {
   if (Array.isArray(value)) return value;
   if (Array.isArray(value?.resultado)) return value.resultado;
   if (Array.isArray(value?.veiculos)) return value.veiculos;
+  if (Array.isArray(value?.dados)) return value.dados;
   if (value && typeof value === "object" && (value.codigo_veiculo || value.placa)) return [value];
   return [];
 }
@@ -112,32 +113,94 @@ function eventsFrom(value: any): any[] {
   return [];
 }
 
+function withFilteredEvents(value: any, events: any[]) {
+  // Mantemos um formato estável para o frontend: sempre { eventos: [...] }.
+  if (value && typeof value === "object" && !Array.isArray(value)) return { ...value, eventos: events };
+  return { eventos: events };
+}
+
+function vehicleCodeOf(item: any) {
+  return String(item?.codigo_veiculo ?? item?.codigo ?? "").trim();
+}
+
+function exactVehicleForPlate(items: any[], normalizedPlate: string) {
+  return items.find((item) => normalizeSgaPlate(item?.placa) === normalizedPlate) || null;
+}
+
+function eventMatchesPlateOrVehicle(event: any, normalizedPlate: string, vehicleCode?: string) {
+  const eventPlate = normalizeSgaPlate(event?.placa);
+  const eventVehicleCode = String(event?.codigo_veiculo ?? "").trim();
+
+  // Se a API trouxe a placa, ela precisa ser exatamente a placa solicitada.
+  if (eventPlate) return eventPlate === normalizedPlate;
+
+  // Alguns retornos podem omitir a placa. Nesse caso só aceitamos quando o
+  // código do veículo veio de uma busca EXATA da placa no cadastro do SGA.
+  return Boolean(vehicleCode && eventVehicleCode && eventVehicleCode === vehicleCode);
+}
+
+type SgaResolutionTrace = {
+  step: string;
+  lookup: string;
+  ok: boolean;
+  status?: number;
+  message?: string;
+  returnedPlates?: string[];
+};
+
 async function lookupVehicleByPlate(normalizedPlate: string) {
-  const trace: Array<{ step: string; lookup: string; ok: boolean; status?: number; message?: string }> = [];
+  const trace: SgaResolutionTrace[] = [];
   const paths = [
     `veiculo/buscar/${encodeURIComponent(normalizedPlate)}/placa`,
+    `veiculo/buscar-por-permissao/${encodeURIComponent(normalizedPlate)}/placa`,
     `veiculo/buscar/${encodeURIComponent(normalizedPlate)}`,
+    `veiculo/buscar-por-permissao/${encodeURIComponent(normalizedPlate)}`,
   ];
 
   let lastError: any = null;
+  let receivedAnyResponse = false;
+
   for (const path of paths) {
     try {
       const data = await sgaFetch(path);
+      receivedAnyResponse = true;
       const vehicles = asArray(data);
-      const exact = vehicles.find((item) => normalizeSgaPlate(item?.placa) === normalizedPlate);
-      const vehicle = exact || vehicles[0] || null;
-      trace.push({ step: "vehicle", lookup: path, ok: Boolean(vehicle) });
-      if (vehicle) return { data, vehicle, trace, error: null };
+      const exact = exactVehicleForPlate(vehicles, normalizedPlate);
+      const returnedPlates = Array.from(new Set(
+        vehicles
+          .map((item) => normalizeSgaPlate(item?.placa))
+          .filter(Boolean),
+      )).slice(0, 8);
+
+      if (exact) {
+        trace.push({ step: "vehicle_exact", lookup: path, ok: true, returnedPlates });
+        return { data, vehicle: exact, trace, error: null };
+      }
+
+      trace.push({
+        step: "vehicle_exact",
+        lookup: path,
+        ok: false,
+        message: vehicles.length > 0
+          ? `Resposta descartada: nenhum veículo retornado possui a placa exata ${normalizedPlate}.`
+          : `Nenhum veículo retornado para a placa ${normalizedPlate}.`,
+        returnedPlates,
+      });
     } catch (error: any) {
       lastError = error;
       trace.push({
-        step: "vehicle",
+        step: "vehicle_exact",
         lookup: path,
         ok: false,
         ...(error?.status ? { status: Number(error.status) } : {}),
         message: String(error?.message || error),
       });
     }
+  }
+
+  if (receivedAnyResponse && !lastError) {
+    lastError = new Error(`Nenhum veículo com a placa exata ${normalizedPlate} foi localizado no SGA.`);
+    lastError.code = "SGA_EXACT_VEHICLE_NOT_FOUND";
   }
 
   return { data: null, vehicle: null, trace, error: lastError };
@@ -147,29 +210,53 @@ export async function resolveSgaEventsByPlate(value: unknown) {
   const normalizedPlate = normalizeSgaPlate(value);
   if (!normalizedPlate) throw new Error("SGA_PLATE_EMPTY");
 
-  const trace: Array<{ step: string; lookup: string; ok: boolean; status?: number; message?: string }> = [];
+  const trace: SgaResolutionTrace[] = [];
   let lastError: any = null;
-  let emptyEventDataByVehicleCode: any = null;
+  let exactVehicle: any = null;
+  let vehicleCode = "";
 
-  // Caminho principal: resolve primeiro o veículo pelo endpoint específico de placa.
+  // 1) Caminho preferencial: localizar SOMENTE um veículo cuja placa seja
+  // exatamente igual à placa solicitada. Nunca usamos o primeiro item retornado.
   const vehicleLookup = await lookupVehicleByPlate(normalizedPlate);
-  const vehicleCode = String(vehicleLookup.vehicle?.codigo_veiculo ?? vehicleLookup.vehicle?.codigo ?? "").trim();
   trace.push(...vehicleLookup.trace);
+  exactVehicle = vehicleLookup.vehicle;
+  vehicleCode = vehicleCodeOf(exactVehicle);
   if (vehicleLookup.error) lastError = vehicleLookup.error;
 
+  // 2) Se encontramos o veículo exato, consultamos os eventos pelo código interno
+  // e filtramos novamente para impedir qualquer associação cruzada.
   if (vehicleCode) {
     try {
       const data = await listSgaEventsByVehicle(vehicleCode);
-      trace.push({ step: "event_by_vehicle_code", lookup: vehicleCode, ok: true });
-      if (eventsFrom(data).length > 0) {
-        return { data, normalizedPlate, vehicleCode, vehicle: vehicleLookup.vehicle, resolvedBy: "vehicle_code", trace };
+      const rawEvents = eventsFrom(data);
+      const exactEvents = rawEvents.filter((event) => eventMatchesPlateOrVehicle(event, normalizedPlate, vehicleCode));
+
+      trace.push({
+        step: "event_by_exact_vehicle_code",
+        lookup: vehicleCode,
+        ok: exactEvents.length > 0,
+        message: exactEvents.length > 0
+          ? `${exactEvents.length} evento(s) confirmado(s) para ${normalizedPlate}.`
+          : rawEvents.length > 0
+            ? `Eventos retornados pelo código ${vehicleCode} foram descartados por não corresponderem à placa ${normalizedPlate}.`
+            : `Nenhum evento encontrado para o veículo ${vehicleCode}.`,
+        returnedPlates: Array.from(new Set(rawEvents.map((event) => normalizeSgaPlate(event?.placa)).filter(Boolean))).slice(0, 8),
+      });
+
+      if (exactEvents.length > 0) {
+        return {
+          data: withFilteredEvents(data, exactEvents),
+          normalizedPlate,
+          vehicleCode,
+          vehicle: exactVehicle,
+          resolvedBy: "vehicle_code_exact",
+          trace,
+        };
       }
-      emptyEventDataByVehicleCode = data;
-      // Mesmo sem eventos, ainda tentamos a placa diretamente como fallback.
     } catch (error: any) {
       lastError = error;
       trace.push({
-        step: "event_by_vehicle_code",
+        step: "event_by_exact_vehicle_code",
         lookup: vehicleCode,
         ok: false,
         ...(error?.status ? { status: Number(error.status) } : {}),
@@ -178,15 +265,40 @@ export async function resolveSgaEventsByPlate(value: unknown) {
     }
   }
 
-  // Fallback: alguns ambientes do SGA aceitam a placa diretamente no endpoint de eventos.
+  // 3) Fallback controlado: consulta direta pela placa. Mesmo que o SGA responda,
+  // só aceitamos eventos cuja placa retornada seja EXATAMENTE a solicitada.
   try {
     const data = await listSgaEventsByVehicle(normalizedPlate);
-    trace.push({ step: "event_by_plate", lookup: normalizedPlate, ok: true });
-    return { data, normalizedPlate, vehicleCode, vehicle: vehicleLookup.vehicle, resolvedBy: "plate", trace };
+    const rawEvents = eventsFrom(data);
+    const exactEvents = rawEvents.filter((event) => normalizeSgaPlate(event?.placa) === normalizedPlate);
+
+    trace.push({
+      step: "event_by_exact_plate",
+      lookup: normalizedPlate,
+      ok: exactEvents.length > 0,
+      message: exactEvents.length > 0
+        ? `${exactEvents.length} evento(s) confirmado(s) pela placa.`
+        : rawEvents.length > 0
+          ? `A consulta retornou eventos, mas nenhum pertence à placa exata ${normalizedPlate}; todos foram descartados.`
+          : `Nenhum evento encontrado diretamente para ${normalizedPlate}.`,
+      returnedPlates: Array.from(new Set(rawEvents.map((event) => normalizeSgaPlate(event?.placa)).filter(Boolean))).slice(0, 8),
+    });
+
+    if (exactEvents.length > 0) {
+      const eventVehicleCode = String(exactEvents[0]?.codigo_veiculo ?? "").trim();
+      return {
+        data: withFilteredEvents(data, exactEvents),
+        normalizedPlate,
+        vehicleCode: vehicleCode || eventVehicleCode,
+        vehicle: exactVehicle,
+        resolvedBy: "plate_exact",
+        trace,
+      };
+    }
   } catch (error: any) {
     lastError = error;
     trace.push({
-      step: "event_by_plate",
+      step: "event_by_exact_plate",
       lookup: normalizedPlate,
       ok: false,
       ...(error?.status ? { status: Number(error.status) } : {}),
@@ -194,18 +306,11 @@ export async function resolveSgaEventsByPlate(value: unknown) {
     });
   }
 
-  if (vehicleCode && emptyEventDataByVehicleCode != null) {
-    return {
-      data: emptyEventDataByVehicleCode,
-      normalizedPlate,
-      vehicleCode,
-      vehicle: vehicleLookup.vehicle,
-      resolvedBy: "vehicle_code",
-      trace,
-    };
-  }
-
-  const finalError: any = lastError instanceof Error ? lastError : new Error("SGA_EVENT_NOT_FOUND");
+  const finalError: any = new Error(
+    `Nenhum evento com correspondência exata para a placa ${normalizedPlate} foi localizado no SGA.`,
+  );
+  finalError.code = "SGA_EXACT_EVENT_NOT_FOUND";
+  finalError.cause = lastError;
   finalError.trace = trace;
   finalError.normalizedPlate = normalizedPlate;
   finalError.vehicleCode = vehicleCode;

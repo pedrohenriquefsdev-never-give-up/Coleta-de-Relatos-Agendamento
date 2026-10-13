@@ -57,9 +57,9 @@ export default function SGAPage() {
         cache: "no-store",
       });
       const data = await res.json().catch(() => ({}));
-      if (!res.ok) throw new Error(`${data.error || "Falha ao consultar o SGA."}${data.technical ? ` — ${data.technical}` : ""}`);
-      setEventResult(data.data);
       setEventResolution(data.resolution || null);
+      if (!res.ok) throw new Error(`${data.error || "Falha ao consultar o SGA."}${data.technical && data.technical !== data.error ? ` — ${data.technical}` : ""}`);
+      setEventResult(data.data);
     } catch (e) {
       setError(e instanceof Error ? e.message : "Falha ao consultar o SGA.");
     } finally {
@@ -132,13 +132,26 @@ export default function SGAPage() {
           <input className="input" value={plate} onChange={(e) => setPlate(e.target.value.toUpperCase().replace(/[^A-Z0-9]/g, "").slice(0, 7))} placeholder="GPV0000 ou ABC1D23" />
           <button className="btn" onClick={searchPlate} disabled={searching}><Search size={15} /> {searching ? "Consultando..." : "Consultar SGA"}</button>
         </div>
-        <small className="field-help">Pode digitar com ou sem hífen. O Portal normaliza a placa e tenta localizar primeiro o veículo no SGA para consultar os eventos pelo código interno.</small>
+        <small className="field-help">Pode digitar com ou sem hífen. O Portal normaliza a placa e só aceita veículo/evento cuja placa retornada corresponda exatamente à consulta.</small>
+
+        {error && Array.isArray(eventResolution?.trace) && eventResolution.trace.length > 0 && (
+          <div className="info-note sga-resolution-note">
+            <strong>Validação estrita:</strong>{" "}
+            {eventResolution.trace.slice(-3).map((item: any, index: number) => (
+              <span key={`${item.step}-${index}`}>
+                {index > 0 ? " • " : ""}
+                {item.ok ? "OK" : "descartado"}: {item.lookup}
+                {Array.isArray(item.returnedPlates) && item.returnedPlates.length > 0 ? ` → ${item.returnedPlates.join(", ")}` : ""}
+              </span>
+            ))}
+          </div>
+        )}
 
         {eventResolution?.resolvedBy && (
           <div className="info-note sga-resolution-note">
             Placa normalizada: <strong>{eventResolution.normalizedPlate || plate}</strong>
             {eventResolution.vehicleCode ? <> • veículo SGA <strong>{eventResolution.vehicleCode}</strong></> : null}
-            {eventResolution.resolvedBy === "vehicle_code" ? " • evento localizado pelo código do veículo" : " • evento localizado diretamente pela placa"}.
+            {eventResolution.resolvedBy === "vehicle_code_exact" ? " • evento confirmado pelo código do veículo" : " • evento confirmado diretamente pela placa"}.
           </div>
         )}
 

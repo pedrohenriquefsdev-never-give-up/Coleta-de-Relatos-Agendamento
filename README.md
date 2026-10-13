@@ -1,3 +1,15 @@
+## V1.39.11 — correspondência estrita de placa no SGA
+
+- Corrige o resolvedor que, na V1.39.10, podia usar o primeiro veículo retornado pelo SGA quando a placa exata não era encontrada.
+- O Portal agora aceita SOMENTE veículo cuja placa normalizada seja exatamente igual à placa solicitada.
+- Foram adicionadas tentativas controladas nos endpoints `veiculo/buscar` e `veiculo/buscar-por-permissao`, sempre com validação exata da placa retornada.
+- Eventos obtidos pelo código interno do veículo são filtrados novamente antes de aparecerem no Portal.
+- O fallback de evento por placa também descarta qualquer evento cuja placa seja diferente da consulta.
+- Se o SGA devolver outro veículo/evento, o Portal retorna “nenhuma correspondência exata” em vez de assumir um resultado.
+- A mesma proteção é reutilizada no envio do PDF, impedindo que um documento seja anexado a evento de outra placa.
+- Nenhuma ENV, permissão do token ou regra do Firestore foi adicionada nesta versão.
+
+
 ## V1.39.10 — resolução robusta de placa/evento no SGA
 
 - Placas são normalizadas para maiúsculas e sem hífen/espaços no Portal (`GPV-0000`, `gpv0000` e `GPV0000` convergem para `GPV0000`).
