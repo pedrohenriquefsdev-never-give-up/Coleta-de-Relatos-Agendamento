@@ -59,13 +59,13 @@ export async function POST(req: NextRequest) {
 
     const resolvedEvents = await resolveSgaEventsByPlate(plate);
     const events = eventArray(resolvedEvents.data);
-    const selectedEvent = events.find((item) => String(item?.codigo_evento ?? "") === eventCode && String(item?.codigo_veiculo ?? "") === vehicleCode);
-    const selectedEventPlate = normalizeSgaPlate(selectedEvent?.placa);
-    const resolvedVehicleCode = String(resolvedEvents.vehicleCode || "").trim();
+    const selectedEvent = events.find((item) => String(item?.codigo_evento ?? "") === eventCode && String(item?.codigo_veiculo ?? item?.veiculo?.codigo ?? "") === vehicleCode);
+    const selectedEventPlate = normalizeSgaPlate(selectedEvent?.placa ?? selectedEvent?.veiculo?.placa);
+    const selectedEventVehicleCode = String(selectedEvent?.codigo_veiculo ?? selectedEvent?.veiculo?.codigo ?? "").trim();
     const eventStillMatchesPlate = Boolean(
       selectedEvent &&
-      (!selectedEventPlate || selectedEventPlate === plate) &&
-      (!resolvedVehicleCode || resolvedVehicleCode === vehicleCode)
+      selectedEventPlate === plate &&
+      selectedEventVehicleCode === vehicleCode
     );
     if (!eventStillMatchesPlate) {
       return Response.json({ error: "O evento selecionado não corresponde mais à placa deste agendamento. Consulte o SGA novamente." }, { status: 409 });

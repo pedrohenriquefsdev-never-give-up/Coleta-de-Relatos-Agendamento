@@ -151,7 +151,11 @@ export default function SGAPage() {
           <div className="info-note sga-resolution-note">
             Placa normalizada: <strong>{eventResolution.normalizedPlate || plate}</strong>
             {eventResolution.vehicleCode ? <> • veículo SGA <strong>{eventResolution.vehicleCode}</strong></> : null}
-            {eventResolution.resolvedBy === "vehicle_code_exact" ? " • evento confirmado pelo código do veículo" : " • evento confirmado diretamente pela placa"}.
+            {eventResolution.resolvedBy === "vehicle_code_exact"
+              ? " • evento confirmado pelo código do veículo"
+              : eventResolution.resolvedBy === "event_list_exact_plate"
+                ? " • evento localizado automaticamente na listagem geral do SGA"
+                : " • evento confirmado diretamente pela placa"}.
           </div>
         )}
 

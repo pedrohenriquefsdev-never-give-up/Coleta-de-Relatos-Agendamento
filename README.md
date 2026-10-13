@@ -190,3 +190,22 @@ Além das permissões já liberadas em Evento, Veículo e Atendimento, o SGA exi
 
 ### Firestore
 Esta versão não adiciona novas gravações diretas pelo navegador. As informações do envio ao SGA são persistidas pelo Firebase Admin no backend, portanto não há uma nova regra de Firestore específica para o SGA nesta versão.
+
+
+## V1.39.10 — Resolução de veículo antes do evento
+- A placa é normalizada sem hífen/caracteres especiais antes da integração com o SGA.
+- O Portal tenta localizar o veículo pela placa e depois consulta o evento pelo código interno do veículo.
+- A consulta direta de evento pela placa permanece como fallback.
+
+## V1.39.11 — Validação estrita de placa
+- O Portal nunca usa o primeiro veículo/evento retornado quando não houver correspondência exata da placa.
+- Respostas de outras placas são descartadas antes de aparecer na interface ou serem usadas no envio de documentos.
+- O envio ao SGA reutiliza a mesma validação estrita.
+
+## V1.39.12 — Fallback automático pela listagem geral de eventos
+- Mantém a busca estrita por veículo e a consulta específica `listar/evento-veiculo`.
+- Se o endpoint específico do SGA responder de forma inconsistente, o Portal consulta automaticamente `POST listar/evento` em janelas de até 30 dias e filtra localmente somente a placa exata.
+- O fallback pesquisa automaticamente eventos recentes sem pedir protocolo ao operador.
+- Retornos do endpoint geral são normalizados para o mesmo formato usado no Portal, inclusive quando placa, veículo e associado vêm em objetos internos.
+- O envio de PDF foi ajustado para validar diretamente placa + código do veículo do evento selecionado, inclusive quando o evento foi encontrado pelo fallback geral.
+- Nenhuma nova variável de ambiente ou regra de Firestore é necessária nesta versão.

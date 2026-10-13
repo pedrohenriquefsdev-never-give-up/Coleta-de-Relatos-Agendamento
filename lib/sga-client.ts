@@ -110,7 +110,61 @@ function asArray(value: any): any[] {
 function eventsFrom(value: any): any[] {
   if (Array.isArray(value)) return value;
   if (Array.isArray(value?.eventos)) return value.eventos;
+  if (Array.isArray(value?.resultado)) return value.resultado;
+  if (Array.isArray(value?.dados)) return value.dados;
   return [];
+}
+
+function eventPlateOf(event: any) {
+  return normalizeSgaPlate(event?.placa ?? event?.veiculo?.placa ?? "");
+}
+
+function eventVehicleCodeOf(event: any) {
+  return String(event?.codigo_veiculo ?? event?.veiculo?.codigo ?? "").trim();
+}
+
+function normalizeSgaEvent(event: any) {
+  const vehicle = event?.veiculo || {};
+  const associate = event?.associado || {};
+  return {
+    ...event,
+    codigo_evento: event?.codigo_evento ?? event?.codigo ?? "",
+    codigo_veiculo: event?.codigo_veiculo ?? vehicle?.codigo ?? "",
+    placa: event?.placa ?? vehicle?.placa ?? "",
+    protocolo: event?.protocolo ?? event?.protocolo_evento ?? "",
+    nome_associado: event?.nome_associado ?? associate?.nome ?? "",
+    cpf_associado: event?.cpf_associado ?? associate?.cpf ?? "",
+    descricao_motivo: event?.descricao_motivo ?? event?.motivo ?? "",
+    situacao_evento: event?.situacao_evento ?? event?.descricao_situacao ?? "",
+  };
+}
+
+function formatSgaDate(date: Date) {
+  return `${String(date.getDate()).padStart(2, "0")}/${String(date.getMonth() + 1).padStart(2, "0")}/${date.getFullYear()}`;
+}
+
+function addDays(date: Date, amount: number) {
+  const next = new Date(date);
+  next.setHours(12, 0, 0, 0);
+  next.setDate(next.getDate() + amount);
+  return next;
+}
+
+export async function listSgaEventsByDateRange(
+  startDate: Date,
+  endDate: Date,
+  page = 0,
+  pageSize = 1000,
+) {
+  return sgaFetch("listar/evento", {
+    method: "POST",
+    body: JSON.stringify({
+      data_cadastro: formatSgaDate(startDate),
+      data_cadastro_final: formatSgaDate(endDate),
+      inicio_paginacao: page,
+      quantidade_por_pagina: pageSize,
+    }),
+  });
 }
 
 function withFilteredEvents(value: any, events: any[]) {
@@ -128,8 +182,8 @@ function exactVehicleForPlate(items: any[], normalizedPlate: string) {
 }
 
 function eventMatchesPlateOrVehicle(event: any, normalizedPlate: string, vehicleCode?: string) {
-  const eventPlate = normalizeSgaPlate(event?.placa);
-  const eventVehicleCode = String(event?.codigo_veiculo ?? "").trim();
+  const eventPlate = eventPlateOf(event);
+  const eventVehicleCode = eventVehicleCodeOf(event);
 
   // Se a API trouxe a placa, ela precisa ser exatamente a placa solicitada.
   if (eventPlate) return eventPlate === normalizedPlate;
@@ -206,6 +260,74 @@ async function lookupVehicleByPlate(normalizedPlate: string) {
   return { data: null, vehicle: null, trace, error: lastError };
 }
 
+async function lookupEventsInGeneralList(normalizedPlate: string, trace: SgaResolutionTrace[]) {
+  // O endpoint específico "listar/evento-veiculo" apresentou inconsistências em
+  // alguns cadastros. Como fallback, varremos a listagem geral em janelas de no
+  // máximo 30 dias (limite documentado pelo SGA) e filtramos localmente pela
+  // placa EXATA. O operador não precisa informar protocolo.
+  const today = new Date();
+  today.setHours(12, 0, 0, 0);
+
+  const windowDays = 30;
+  const maxDaysBack = 365;
+  const pageSize = 1000;
+  const maxPagesPerWindow = 10;
+
+  for (let daysBack = 0; daysBack < maxDaysBack; daysBack += windowDays) {
+    const end = addDays(today, -daysBack);
+    const start = addDays(end, -(windowDays - 1));
+    const label = `${formatSgaDate(start)}–${formatSgaDate(end)}`;
+
+    for (let page = 0; page < maxPagesPerWindow; page += 1) {
+      try {
+        const data = await listSgaEventsByDateRange(start, end, page, pageSize);
+        const rawEvents = eventsFrom(data);
+        const normalizedEvents = rawEvents.map(normalizeSgaEvent);
+        const exactEvents = normalizedEvents.filter((event) => eventPlateOf(event) === normalizedPlate);
+
+        trace.push({
+          step: "event_general_list_exact_plate",
+          lookup: `${label} / página ${page + 1}`,
+          ok: exactEvents.length > 0,
+          message: exactEvents.length > 0
+            ? `${exactEvents.length} evento(s) localizado(s) automaticamente na listagem geral para ${normalizedPlate}.`
+            : `${rawEvents.length} evento(s) analisado(s) nesta página; nenhum pertence à placa ${normalizedPlate}.`,
+          returnedPlates: exactEvents.length > 0
+            ? Array.from(new Set(exactEvents.map((event) => eventPlateOf(event)).filter(Boolean))).slice(0, 8)
+            : [],
+        });
+
+        if (exactEvents.length > 0) {
+          const eventVehicleCode = eventVehicleCodeOf(exactEvents[0]);
+          return {
+            data: { eventos: exactEvents },
+            vehicleCode: eventVehicleCode,
+            resolvedBy: "event_list_exact_plate",
+          };
+        }
+
+        const totalPages = Number(data?.paginacao?.numero_paginas ?? data?.paginacao?.total_paginas ?? 0);
+        if (rawEvents.length < pageSize || (Number.isFinite(totalPages) && totalPages > 0 && page + 1 >= totalPages)) {
+          break;
+        }
+      } catch (error: any) {
+        trace.push({
+          step: "event_general_list_exact_plate",
+          lookup: `${label} / página ${page + 1}`,
+          ok: false,
+          ...(error?.status ? { status: Number(error.status) } : {}),
+          message: String(error?.message || error),
+        });
+        // Se uma janela falhar por limitação momentânea, seguimos para a próxima
+        // em vez de abandonar toda a resolução da placa.
+        break;
+      }
+    }
+  }
+
+  return null;
+}
+
 export async function resolveSgaEventsByPlate(value: unknown) {
   const normalizedPlate = normalizeSgaPlate(value);
   if (!normalizedPlate) throw new Error("SGA_PLATE_EMPTY");
@@ -240,7 +362,7 @@ export async function resolveSgaEventsByPlate(value: unknown) {
           : rawEvents.length > 0
             ? `Eventos retornados pelo código ${vehicleCode} foram descartados por não corresponderem à placa ${normalizedPlate}.`
             : `Nenhum evento encontrado para o veículo ${vehicleCode}.`,
-        returnedPlates: Array.from(new Set(rawEvents.map((event) => normalizeSgaPlate(event?.placa)).filter(Boolean))).slice(0, 8),
+        returnedPlates: Array.from(new Set(rawEvents.map((event) => eventPlateOf(event)).filter(Boolean))).slice(0, 8),
       });
 
       if (exactEvents.length > 0) {
@@ -270,7 +392,7 @@ export async function resolveSgaEventsByPlate(value: unknown) {
   try {
     const data = await listSgaEventsByVehicle(normalizedPlate);
     const rawEvents = eventsFrom(data);
-    const exactEvents = rawEvents.filter((event) => normalizeSgaPlate(event?.placa) === normalizedPlate);
+    const exactEvents = rawEvents.map(normalizeSgaEvent).filter((event) => eventPlateOf(event) === normalizedPlate);
 
     trace.push({
       step: "event_by_exact_plate",
@@ -281,7 +403,7 @@ export async function resolveSgaEventsByPlate(value: unknown) {
         : rawEvents.length > 0
           ? `A consulta retornou eventos, mas nenhum pertence à placa exata ${normalizedPlate}; todos foram descartados.`
           : `Nenhum evento encontrado diretamente para ${normalizedPlate}.`,
-      returnedPlates: Array.from(new Set(rawEvents.map((event) => normalizeSgaPlate(event?.placa)).filter(Boolean))).slice(0, 8),
+      returnedPlates: Array.from(new Set(rawEvents.map((event) => eventPlateOf(event)).filter(Boolean))).slice(0, 8),
     });
 
     if (exactEvents.length > 0) {
@@ -304,6 +426,21 @@ export async function resolveSgaEventsByPlate(value: unknown) {
       ...(error?.status ? { status: Number(error.status) } : {}),
       message: String(error?.message || error),
     });
+  }
+
+  // 4) Fallback automático final: consulta a listagem geral de eventos em
+  // janelas de 30 dias e filtra SOMENTE a placa exata. Isso evita exigir que o
+  // operador abra o SGA para descobrir ou digitar protocolo.
+  const generalLookup = await lookupEventsInGeneralList(normalizedPlate, trace);
+  if (generalLookup) {
+    return {
+      data: generalLookup.data,
+      normalizedPlate,
+      vehicleCode: generalLookup.vehicleCode || vehicleCode,
+      vehicle: exactVehicle,
+      resolvedBy: generalLookup.resolvedBy,
+      trace,
+    };
   }
 
   const finalError: any = new Error(
