@@ -1,0 +1,2 @@
+Portal Coleta de Relatos V1.39.6
+Auditoria via backend, disponibilidade via backend e exportação do histórico VTCall.

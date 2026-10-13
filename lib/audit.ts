@@ -1,13 +1,14 @@
-import { addDoc, collection, serverTimestamp } from "firebase/firestore";
-import { db } from "./firebase";
+import { auth } from "./firebase";
 
-export async function writeAudit(action: string, details: Record<string, unknown> = {}) {
+export async function writeAudit(action: string, details: Record<string, unknown> = {}, targetId = "") {
   try {
-    await addDoc(collection(db, "auditLogs"), {
-      action,
-      details,
-      createdAt: serverTimestamp(),
-      userAgent: typeof navigator !== "undefined" ? navigator.userAgent : null,
+    const current = auth.currentUser;
+    if (!current) return;
+    const token = await current.getIdToken();
+    await fetch("/api/audit", {
+      method: "POST",
+      headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+      body: JSON.stringify({ action, details, targetId }),
     });
   } catch (error) {
     console.error("Falha ao registrar auditoria", error);

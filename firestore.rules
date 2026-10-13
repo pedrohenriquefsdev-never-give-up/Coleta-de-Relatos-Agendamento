@@ -30,13 +30,13 @@ service cloud.firestore {
 
     match /agendaAvailability/{date} {
       allow read: if active();
-      allow create, update, delete: if availabilityManager();
+      // Escrita passa exclusivamente pela API protegida do portal (Firebase Admin).
+      allow create, update, delete: if false;
     }
 
     match /auditLogs/{id} {
-      allow read: if management();
-      allow create: if active() && request.resource.data.userId == request.auth.uid;
-      allow update, delete: if false;
+      // Leitura e escrita passam exclusivamente pela API protegida do portal (Firebase Admin).
+      allow read, create, update, delete: if false;
     }
 
     match /settings/{id} {

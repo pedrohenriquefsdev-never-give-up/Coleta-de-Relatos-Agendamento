@@ -1,7 +1,7 @@
 "use client";
 
 import { onAuthStateChanged, signOut, type User } from "firebase/auth";
-import { doc, onSnapshot, serverTimestamp, setDoc, updateDoc } from "firebase/firestore";
+import { doc, onSnapshot, serverTimestamp, updateDoc } from "firebase/firestore";
 import { useRouter } from "next/navigation";
 import { createContext, useContext, useEffect, useState } from "react";
 import { auth, db } from "@/lib/firebase";
@@ -11,6 +11,20 @@ import { effectiveRole } from "@/lib/access-control";
 const AuthContext = createContext<{ user: User | null; profile: AppUser | null; logout: () => Promise<void> }>({ user: null, profile: null, logout: async () => {} });
 
 export function useSession() { return useContext(AuthContext); }
+
+async function sendAudit(current: User, action: "LOGIN_SUCCESS" | "LOGOUT") {
+  try {
+    const token = await current.getIdToken();
+    await fetch("/api/audit", {
+      method: "POST",
+      headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+      body: JSON.stringify({ action }),
+      keepalive: action === "LOGOUT",
+    });
+  } catch {
+    // Auditoria não deve impedir login ou logout.
+  }
+}
 
 export default function AuthGate({ children }: { children: React.ReactNode }) {
   const router = useRouter();
@@ -54,13 +68,7 @@ export default function AuthGate({ children }: { children: React.ReactNode }) {
       });
 
       updateDoc(ref, { lastAccessAt: serverTimestamp() }).catch(() => undefined);
-      setDoc(doc(db, "auditLogs", `${current.uid}_${Date.now()}`), {
-        userId: current.uid,
-        userName: current.displayName || current.email || "Usuário",
-        userEmail: current.email || "",
-        action: "LOGIN_SUCCESS",
-        createdAt: serverTimestamp()
-      }).catch(() => undefined);
+      sendAudit(current, "LOGIN_SUCCESS");
     });
 
     return () => {
@@ -69,7 +77,13 @@ export default function AuthGate({ children }: { children: React.ReactNode }) {
     };
   }, [router]);
 
-  const logout = async () => { await signOut(auth); router.replace("/login"); };
+  const logout = async () => {
+    const current = auth.currentUser;
+    if (current) await sendAudit(current, "LOGOUT");
+    await signOut(auth);
+    router.replace("/login");
+  };
+
   if (loading) return <div className="loading"><div className="spinner" /></div>;
   if (!user || !profile) return null;
   return <AuthContext.Provider value={{ user, profile, logout }}>{children}</AuthContext.Provider>;

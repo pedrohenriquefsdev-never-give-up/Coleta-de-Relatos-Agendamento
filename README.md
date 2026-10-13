@@ -1,4 +1,4 @@
-# Portal Coleta de Relatos — V1.39.5
+# Portal Coleta de Relatos — V1.39.6
 
 Portal interno para agenda, gestão de acessos, auditoria e futura integração com VTCall.
 
@@ -108,3 +108,13 @@ Depois de alterar Environment Variables, faça um novo deploy.
 - Fechar um dia com coletas existentes exige confirmação e não apaga os registros existentes.
 - Alterações de agendamentos já existentes continuam permitidas quando a data não muda, mesmo se o dia tiver sido fechado depois.
 - Segurança reforçada nas regras do Firestore para impedir criação/mudança de data para dias não liberados.
+
+
+## V1.39.6 — Auditoria, disponibilidade e exportação VTCall
+- Logs passam a ser gravados e consultados pelo backend com Firebase Admin, sem depender de permissão direta do navegador na coleção `auditLogs`.
+- A tela de Logs agora diferencia carregamento, vazio e erro, além de possuir atualização manual.
+- Login, logout e criação/edição/exclusão de agendamentos entram na trilha de auditoria pelo backend.
+- Liberação e fechamento de dias passam pela API protegida do portal, corrigindo o erro `Missing or insufficient permissions` mesmo quando a regra antiga do Firestore ainda está publicada.
+- A permissão `Pode liberar dias da agenda` é validada no servidor; Desenvolvedor e Administrador continuam autorizados automaticamente.
+- Disponibilidade da agenda é carregada pelo backend e atualizada periodicamente para todos os usuários.
+- Histórico de tentativas de ligação ganhou botão `Exportar`, gerando CSV compatível com Excel com todas as tentativas carregadas do agendamento.

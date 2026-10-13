@@ -2,48 +2,31 @@
 
 import { addDays, addMonths, format, startOfMonth, startOfWeek } from "date-fns";
 import { ptBR } from "date-fns/locale";
-import { addDoc, collection, doc, serverTimestamp, setDoc } from "firebase/firestore";
 import { CalendarCheck2, CalendarX2, ChevronLeft, ChevronRight, LockKeyhole } from "lucide-react";
 import { useMemo, useState } from "react";
-import { db } from "@/lib/firebase";
 import type { AgendaAvailability, Appointment } from "@/lib/types";
 import { useSession } from "./AuthGate";
 
 type Props = {
   availability: Record<string, AgendaAvailability>;
   appointments: Appointment[];
+  onChanged?: (item: AgendaAvailability) => void;
 };
 
-export default function AgendaAvailabilityManager({ availability, appointments }: Props) {
-  const { user, profile } = useSession();
+export default function AgendaAvailabilityManager({ availability, appointments, onChanged }: Props) {
+  const { user } = useSession();
   const [monthOffset, setMonthOffset] = useState(0);
   const [savingDate, setSavingDate] = useState<string | null>(null);
   const [message, setMessage] = useState("");
+  const [messageKind, setMessageKind] = useState<"info" | "error">("info");
 
   const month = useMemo(() => addMonths(startOfMonth(new Date()), monthOffset), [monthOffset]);
   const gridStart = useMemo(() => startOfWeek(month, { weekStartsOn: 1 }), [month]);
   const days = useMemo(() => Array.from({ length: 42 }, (_, i) => addDays(gridStart, i)), [gridStart]);
   const today = format(new Date(), "yyyy-MM-dd");
 
-  async function audit(action: string, date: string) {
-    if (!user || !profile) return;
-    try {
-      await addDoc(collection(db, "auditLogs"), {
-        userId: user.uid,
-        userName: profile.name,
-        userEmail: profile.email,
-        action,
-        targetId: date,
-        details: { date },
-        createdAt: serverTimestamp(),
-      });
-    } catch {
-      // A auditoria não deve impedir a gestão da agenda.
-    }
-  }
-
   async function toggle(date: string) {
-    if (!user || !profile || date < today) return;
+    if (!user || date < today) return;
     const isOpen = availability[date]?.enabled === true;
     const activeAppointments = appointments.filter((item) => item.date === date && item.status !== "cancelado");
 
@@ -56,31 +39,27 @@ export default function AgendaAvailabilityManager({ availability, appointments }
 
     setSavingDate(date);
     setMessage("");
+    setMessageKind("info");
     try {
-      if (isOpen) {
-        await setDoc(doc(db, "agendaAvailability", date), {
-          date,
-          enabled: false,
-          closedBy: user.uid,
-          closedByName: profile.name,
-          closedAt: serverTimestamp(),
-          updatedAt: serverTimestamp(),
-        }, { merge: true });
-        await audit("AGENDA_DAY_CLOSED", date);
-        setMessage(`Dia ${date.split("-").reverse().join("/")} fechado para novos agendamentos.`);
-      } else {
-        await setDoc(doc(db, "agendaAvailability", date), {
-          date,
-          enabled: true,
-          openedBy: user.uid,
-          openedByName: profile.name,
-          openedAt: serverTimestamp(),
-          updatedAt: serverTimestamp(),
-        }, { merge: true });
-        await audit("AGENDA_DAY_OPENED", date);
-        setMessage(`Dia ${date.split("-").reverse().join("/")} liberado para agendamentos.`);
-      }
+      const token = await user.getIdToken();
+      const response = await fetch("/api/agenda/availability", {
+        method: "PATCH",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify({ date, enabled: !isOpen }),
+      });
+      const data = await response.json().catch(() => ({}));
+      if (!response.ok) throw new Error(data.error || "Não foi possível alterar a disponibilidade.");
+      if (data.item) onChanged?.(data.item as AgendaAvailability);
+      setMessage(
+        !isOpen
+          ? `Dia ${date.split("-").reverse().join("/")} liberado para agendamentos.`
+          : `Dia ${date.split("-").reverse().join("/")} fechado para novos agendamentos.`,
+      );
     } catch (e) {
+      setMessageKind("error");
       setMessage(e instanceof Error ? e.message : "Não foi possível alterar a disponibilidade.");
     } finally {
       setSavingDate(null);
@@ -107,7 +86,7 @@ export default function AgendaAvailabilityManager({ availability, appointments }
         <div><LockKeyhole size={17} /><span><strong>Controle operacional</strong><small>Somente usuários autorizados liberam dias</small></span></div>
       </div>
 
-      {message && <div className="info-note availability-message">{message}</div>}
+      {message && <div className={`${messageKind === "error" ? "error" : "info-note"} availability-message`}>{message}</div>}
 
       <div className="availability-month-title">{format(month, "MMMM 'de' yyyy", { locale: ptBR })}</div>
       <div className="availability-calendar">

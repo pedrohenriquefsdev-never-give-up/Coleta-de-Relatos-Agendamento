@@ -2,7 +2,7 @@
 
 import { addDays, format, startOfWeek } from "date-fns";
 import { ptBR } from "date-fns/locale";
-import { collection, limit, onSnapshot, orderBy, query } from "firebase/firestore";
+import { collection, onSnapshot, orderBy, query } from "firebase/firestore";
 import {
   CalendarCheck2,
   CalendarDays,
@@ -18,6 +18,7 @@ import {
   Pencil,
   PhoneCall,
   Plus,
+  RefreshCw,
   Search,
   Trash2,
   UserRound,
@@ -58,6 +59,7 @@ const hours = [
 
 const actions: Record<string, string> = {
   LOGIN_SUCCESS: "Login realizado",
+  LOGOUT: "Saiu do portal",
   APPOINTMENT_CREATED: "Criou agendamento",
   APPOINTMENT_UPDATED: "Alterou agendamento",
   APPOINTMENT_DELETED: "Excluiu agendamento",
@@ -94,12 +96,15 @@ const appointmentStatusLabels: Record<string, string> = {
 };
 
 export default function Dashboard() {
-  const { profile, logout } = useSession();
+  const { user, profile, logout } = useSession();
   const [tab, setTab] = useState("agenda");
   const [appointments, setAppointments] = useState<Appointment[]>([]);
   const [users, setUsers] = useState<AppUser[]>([]);
   const [logs, setLogs] = useState<any[]>([]);
+  const [logsLoading, setLogsLoading] = useState(false);
+  const [logsError, setLogsError] = useState("");
   const [availability, setAvailability] = useState<Record<string, AgendaAvailability>>({});
+  const [availabilityError, setAvailabilityError] = useState("");
   const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState("todos");
   const [responsibleFilter, setResponsibleFilter] = useState("todos");
@@ -119,28 +124,68 @@ export default function Dashboard() {
     });
   }, []);
 
-  useEffect(() => {
-    return onSnapshot(collection(db, "agendaAvailability"), (snapshot) => {
-      const next: Record<string, AgendaAvailability> = {};
-      snapshot.docs.forEach((docSnap) => {
-        const data = docSnap.data() as Partial<AgendaAvailability>;
-        next[docSnap.id] = { date: data.date || docSnap.id, enabled: data.enabled === true, ...data } as AgendaAvailability;
+  async function loadAvailability(silent = false) {
+    if (!user) return;
+    if (!silent) setAvailabilityError("");
+    try {
+      const token = await user.getIdToken();
+      const response = await fetch(`/api/agenda/availability?t=${Date.now()}`, {
+        headers: { Authorization: `Bearer ${token}` },
+        cache: "no-store",
       });
+      const data = await response.json().catch(() => ({}));
+      if (!response.ok) throw new Error(data.error || "Não foi possível carregar a disponibilidade da agenda.");
+      const next: Record<string, AgendaAvailability> = {};
+      for (const item of Array.isArray(data.availability) ? data.availability : []) {
+        if (item?.date) next[item.date] = item as AgendaAvailability;
+      }
       setAvailability(next);
-    });
-  }, []);
+      setAvailabilityError("");
+    } catch (e) {
+      if (!silent) setAvailabilityError(e instanceof Error ? e.message : "Não foi possível carregar a disponibilidade da agenda.");
+    }
+  }
+
+  async function loadLogs(silent = false) {
+    if (!user || !profile || !isManagementRole(profile.role)) return;
+    if (!silent) setLogsLoading(true);
+    setLogsError("");
+    try {
+      const token = await user.getIdToken();
+      const response = await fetch(`/api/audit?limit=200&t=${Date.now()}`, {
+        headers: { Authorization: `Bearer ${token}` },
+        cache: "no-store",
+      });
+      const data = await response.json().catch(() => ({}));
+      if (!response.ok) throw new Error(data.error || "Não foi possível carregar os logs.");
+      setLogs(Array.isArray(data.logs) ? data.logs : []);
+    } catch (e) {
+      setLogsError(e instanceof Error ? e.message : "Não foi possível carregar os logs.");
+    } finally {
+      if (!silent) setLogsLoading(false);
+    }
+  }
+
+  useEffect(() => {
+    if (!user) return;
+    loadAvailability();
+    const timer = window.setInterval(() => loadAvailability(true), 30000);
+    return () => window.clearInterval(timer);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [user]);
 
   useEffect(() => {
     if (!profile || !isManagementRole(profile.role)) {
       setLogs([]);
+      setLogsError("");
       return;
     }
-    return onSnapshot(
-      query(collection(db, "auditLogs"), orderBy("createdAt", "desc"), limit(100)),
-      (snapshot) => setLogs(snapshot.docs.map((docSnap) => ({ id: docSnap.id, ...docSnap.data() }))),
-      () => setLogs([]),
-    );
-  }, [profile]);
+    if (tab !== "logs") return;
+    loadLogs();
+    const timer = window.setInterval(() => loadLogs(true), 20000);
+    return () => window.clearInterval(timer);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [profile, tab, user]);
 
   const start = useMemo(() => addDays(startOfWeek(new Date(), { weekStartsOn: 1 }), weekOffset * 7), [weekOffset]);
   const days = useMemo(() => Array.from({ length: 7 }, (_, i) => addDays(start, i)), [start]);
@@ -272,7 +317,17 @@ export default function Dashboard() {
 
     if (tab === "disponibilidade") {
       return canManageAvailability ? (
-        <AgendaAvailabilityManager availability={availability} appointments={appointments} />
+        <div className="stack">
+          {availabilityError && <div className="error">{availabilityError}</div>}
+          <AgendaAvailabilityManager
+            availability={availability}
+            appointments={appointments}
+            onChanged={(item) => {
+              setAvailability((current) => ({ ...current, [item.date]: item }));
+              setAvailabilityError("");
+            }}
+          />
+        </div>
       ) : (
         <div className="panel"><div className="empty">Seu usuário não possui permissão para liberar dias da agenda.</div></div>
       );
@@ -293,7 +348,11 @@ export default function Dashboard() {
               <h2>Logs e auditoria</h2>
               <small>Histórico das principais ações realizadas no portal.</small>
             </div>
+            <button className="btn" onClick={() => loadLogs()} disabled={logsLoading}>
+              <RefreshCw size={14} className={logsLoading ? "spin-icon" : ""} /> {logsLoading ? "Atualizando..." : "Atualizar"}
+            </button>
           </div>
+          {logsError && <div className="error logs-message">{logsError}</div>}
           <div className="table-wrap">
             <table className="table">
               <thead>
@@ -305,14 +364,20 @@ export default function Dashboard() {
                 </tr>
               </thead>
               <tbody>
-                {logs.map((l) => (
-                  <tr key={l.id}>
-                    <td>{l.createdAt?.toDate ? format(l.createdAt.toDate(), "dd/MM/yyyy HH:mm") : "—"}</td>
-                    <td>{l.userName || l.userEmail || "Sistema"}</td>
-                    <td>{actions[l.action] || l.action}</td>
-                    <td>{l.details?.fullName || l.details?.plate || l.details?.phone || l.targetId || "—"}</td>
-                  </tr>
-                ))}
+                {logsLoading && logs.length === 0 ? (
+                  <tr><td colSpan={4}><div className="empty">Carregando histórico...</div></td></tr>
+                ) : logs.length === 0 && !logsError ? (
+                  <tr><td colSpan={4}><div className="empty">Nenhuma atividade registrada.</div></td></tr>
+                ) : (
+                  logs.map((l) => (
+                    <tr key={l.id}>
+                      <td>{l.createdAt ? format(new Date(l.createdAt), "dd/MM/yyyy HH:mm") : "—"}</td>
+                      <td>{l.userName || l.userEmail || "Sistema"}</td>
+                      <td>{actions[l.action] || l.action}</td>
+                      <td>{l.details?.fullName || l.details?.plate || l.details?.targetUserName || l.details?.date || l.details?.phone || l.targetId || "—"}</td>
+                    </tr>
+                  ))
+                )}
               </tbody>
             </table>
           </div>

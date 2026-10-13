@@ -2,7 +2,7 @@
 
 import { format } from "date-fns";
 import { addDoc, collection, deleteDoc, doc, serverTimestamp, updateDoc } from "firebase/firestore";
-import { History, PhoneCall, RefreshCw, Trash2 } from "lucide-react";
+import { Download, History, PhoneCall, RefreshCw, Trash2 } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 import { db } from "@/lib/firebase";
 import { useSession } from "./AuthGate";
@@ -43,14 +43,6 @@ type CallAttempt = {
   providerResponse: string;
   requestedAt: string | null;
 };
-
-async function tryWriteAudit(payload: Record<string, unknown>) {
-  try {
-    await addDoc(collection(db, "auditLogs"), { ...payload, createdAt: serverTimestamp() });
-  } catch {
-    // auditoria não deve impedir o fluxo principal
-  }
-}
 
 export default function AppointmentModal({
   initial,
@@ -156,6 +148,46 @@ export default function AppointmentModal({
 
   async function getToken() {
     return user?.getIdToken();
+  }
+
+  async function writeAudit(action: string, targetId: string, details: Record<string, unknown>) {
+    try {
+      const token = await getToken();
+      if (!token) return;
+      await fetch("/api/audit", {
+        method: "POST",
+        headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+        body: JSON.stringify({ action, targetId, details }),
+      });
+    } catch {
+      // Auditoria não deve impedir o fluxo principal.
+    }
+  }
+
+  function exportCallHistory() {
+    if (!initial || callAttempts.length === 0) return;
+    const escape = (value: unknown) => `"${String(value ?? "").replaceAll('"', '""')}"`;
+    const rows = [
+      ["Data/Hora", "Status", "Ramal", "Telefone", "Usuário", "Retorno VTCall"],
+      ...callAttempts.map((attempt) => [
+        attempt.requestedAt ? new Date(attempt.requestedAt).toLocaleString("pt-BR") : "",
+        attempt.status === "requested" ? "Solicitada" : attempt.status,
+        attempt.extension,
+        attempt.phone,
+        attempt.userName,
+        attempt.providerResponse,
+      ]),
+    ];
+    const csv = "\uFEFF" + rows.map((row) => row.map(escape).join(";")).join("\r\n");
+    const blob = new Blob([csv], { type: "text/csv;charset=utf-8;" });
+    const url = URL.createObjectURL(blob);
+    const anchor = document.createElement("a");
+    anchor.href = url;
+    anchor.download = `historico-ligacoes-${cleanPlate(initial.plate) || initial.id}-${initial.date}.csv`;
+    document.body.appendChild(anchor);
+    anchor.click();
+    anchor.remove();
+    URL.revokeObjectURL(url);
   }
 
   async function refreshRamalStatus(silent = false): Promise<RamalStatus | null> {
@@ -296,13 +328,14 @@ export default function AppointmentModal({
 
       if (initial) {
         await updateDoc(doc(db, "appointments", initial.id), payload);
-        await tryWriteAudit({
-          userId: user!.uid,
-          userName: profile!.name,
-          userEmail: profile!.email,
-          action: "APPOINTMENT_UPDATED",
-          targetId: initial.id,
-          details: { plate: payload.plate, fullName: payload.fullName, phone: payload.phone, status: payload.status, assignedToName: payload.assignedToName },
+        await writeAudit("APPOINTMENT_UPDATED", initial.id, {
+          plate: payload.plate,
+          fullName: payload.fullName,
+          phone: payload.phone,
+          status: payload.status,
+          assignedToName: payload.assignedToName,
+          date: payload.date,
+          time: payload.time,
         });
       } else {
         const created = await addDoc(collection(db, "appointments"), {
@@ -311,13 +344,14 @@ export default function AppointmentModal({
           createdBy: user!.uid,
           createdByName: profile!.name,
         });
-        await tryWriteAudit({
-          userId: user!.uid,
-          userName: profile!.name,
-          userEmail: profile!.email,
-          action: "APPOINTMENT_CREATED",
-          targetId: created.id,
-          details: { plate: payload.plate, fullName: payload.fullName, phone: payload.phone, status: payload.status, assignedToName: payload.assignedToName },
+        await writeAudit("APPOINTMENT_CREATED", created.id, {
+          plate: payload.plate,
+          fullName: payload.fullName,
+          phone: payload.phone,
+          status: payload.status,
+          assignedToName: payload.assignedToName,
+          date: payload.date,
+          time: payload.time,
         });
       }
 
@@ -339,13 +373,12 @@ export default function AppointmentModal({
     setError("");
     try {
       await deleteDoc(doc(db, "appointments", initial.id));
-      await tryWriteAudit({
-        userId: user!.uid,
-        userName: profile!.name,
-        userEmail: profile!.email,
-        action: "APPOINTMENT_DELETED",
-        targetId: initial.id,
-        details: { plate: initial.plate, fullName: initial.fullName, phone: initial.phone },
+      await writeAudit("APPOINTMENT_DELETED", initial.id, {
+        plate: initial.plate,
+        fullName: initial.fullName,
+        phone: initial.phone,
+        date: initial.date,
+        time: initial.time,
       });
       onSaved();
       onClose();
@@ -554,9 +587,14 @@ export default function AppointmentModal({
                 <History size={16} />
                 <span><strong>Histórico de ligações</strong><small>Tentativas realizadas a partir deste agendamento.</small></span>
               </div>
-              <button type="button" className="icon-btn mini" onClick={() => loadCallHistory()} disabled={historyLoading} title="Atualizar histórico">
-                <RefreshCw size={14} className={historyLoading ? "spin-icon" : ""} />
-              </button>
+              <div className="call-history-actions">
+                <button type="button" className="btn compact" onClick={exportCallHistory} disabled={callAttempts.length === 0} title="Exportar histórico de tentativas em CSV">
+                  <Download size={13} /> Exportar
+                </button>
+                <button type="button" className="icon-btn mini" onClick={() => loadCallHistory()} disabled={historyLoading} title="Atualizar histórico">
+                  <RefreshCw size={14} className={historyLoading ? "spin-icon" : ""} />
+                </button>
+              </div>
             </div>
 
             {historyLoading && callAttempts.length === 0 ? (
