@@ -1,0 +1,1 @@
+V1.39.9 — separa quem agenda do operador da coleta, disponibilidade por operador, proteção VTCall/SGA e fluxo de teste SGA.

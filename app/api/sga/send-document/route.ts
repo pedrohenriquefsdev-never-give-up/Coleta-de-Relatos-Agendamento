@@ -48,6 +48,10 @@ export async function POST(req: NextRequest) {
 
     const report = await loadCallHistoryData(appointmentId);
     if (!report) return Response.json({ error: "Agendamento não encontrado." }, { status: 404 });
+    const assignedOperator = String(report.appointment.assignedTo || report.appointment.createdBy || "");
+    if (!isDeveloper(actor) && actor.role !== "admin" && assignedOperator !== actor.uid) {
+      return Response.json({ error: `Esta coleta está atribuída a ${report.appointment.assignedToName || report.appointment.createdByName || "outro operador"}.` }, { status: 403 });
+    }
     if (report.attempts.length === 0) return Response.json({ error: "Não há tentativas de ligação para gerar o histórico em PDF." }, { status: 409 });
 
     const plate = String(report.appointment.plate || "").toUpperCase().replace(/[^A-Z0-9]/g, "");

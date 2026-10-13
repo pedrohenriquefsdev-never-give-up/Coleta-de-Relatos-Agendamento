@@ -1,3 +1,14 @@
+
+## V1.39.9 — operador da coleta separado de quem agenda
+
+- `createdBy/createdByName` identifica quem criou o agendamento (ex.: Thamyres/Nataly).
+- `assignedTo/assignedToName` identifica quem realizará a coleta/ligação (ex.: Samuel).
+- Novo campo de usuário `canPerformCollections`: somente usuários marcados aparecem como operadores da coleta e podem receber faixas de disponibilidade.
+- Disponibilidade é cadastrada por operador da coleta; qualquer Atendente autorizado a criar agendamentos pode utilizar os horários publicados para esse operador.
+- VTCall e envio operacional ao SGA ficam restritos ao operador atribuído, com override de Administrador/Desenvolvedor.
+- PDF registra tanto “Responsável pela coleta” quanto “Agendado por”.
+- Fluxo SGA da V1.39.8 permanece: consulta do evento, observação, classificação e upload do PDF diretamente no evento.
+
 # Portal Coleta de Relatos — V1.39.7
 
 Portal interno para agenda, gestão de acessos, auditoria, VTCall e integração gradual com o SGA.
@@ -137,7 +148,7 @@ Como as gravações de agendamento agora passam pelo backend, publique também o
 Na Vercel, configure as variáveis SGA apenas no ambiente Production. A senha e o token nunca devem usar prefixo `NEXT_PUBLIC_`.
 
 
-## V1.39.8 - Envio operacional ao SGA
+## V1.39.9 - Envio operacional ao SGA
 - O módulo SGA passou a testar também Situações de Evento e Tipos de Foto/Documento.
 - A consulta de evento por placa agora exibe também o código do veículo, necessário para anexar documentos ao Evento.
 - O modal do agendamento ganhou a área **Enviar coleta ao SGA**.
@@ -152,7 +163,7 @@ Na Vercel, configure as variáveis SGA apenas no ambiente Production. A senha e 
 - Nenhuma credencial SGA é enviada ao navegador.
 
 ### Permissão adicional para o upload
-Além das permissões já liberadas em Evento, Veículo e Atendimento, o SGA exige o código do tipo/classificação do arquivo. A V1.39.8 consulta `listar/tipo-foto/ativo`; se o teste indicar falta de permissão, habilite **Vistoria → listar tipo foto** no token do Portal.
+Além das permissões já liberadas em Evento, Veículo e Atendimento, o SGA exige o código do tipo/classificação do arquivo. A V1.39.9 consulta `listar/tipo-foto/ativo`; se o teste indicar falta de permissão, habilite **Vistoria → listar tipo foto** no token do Portal.
 
 ### Firestore
 Esta versão não adiciona novas gravações diretas pelo navegador. As informações do envio ao SGA são persistidas pelo Firebase Admin no backend, portanto não há uma nova regra de Firestore específica para o SGA nesta versão.

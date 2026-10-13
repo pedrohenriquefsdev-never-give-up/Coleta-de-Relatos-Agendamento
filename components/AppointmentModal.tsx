@@ -119,8 +119,8 @@ export default function AppointmentModal({
     date: initialFormDate,
     time: initial?.time || defaultTime || "08:00",
     durationMinutes: initial?.durationMinutes || 30,
-    assignedTo: initial?.assignedTo || initial?.createdBy || profile?.uid || "",
-    assignedToName: initial?.assignedToName || initial?.createdByName || profile?.name || "",
+    assignedTo: initial ? (initial.assignedTo || initial.createdBy || "") : "",
+    assignedToName: initial ? (initial.assignedToName || initial.createdByName || "") : "",
     status: ((initial?.status === "atendido" ? "concluido" : initial?.status) || "agendado") as AppointmentStatus,
     notes: initial?.notes || "",
     sgaObservation: initial?.sgaObservation || initial?.sga?.lastUpload?.observation || "",
@@ -129,13 +129,31 @@ export default function AppointmentModal({
   const title = useMemo(() => (initial ? `Agendamento • ${initial.plate}` : "Novo agendamento"), [initial]);
   const canDelete = !!initial && !readOnly && (profile?.role === "desenvolvedor" || profile?.role === "admin");
 
-  const operationalUsers = useMemo(
-    () => availableUsers.filter((item) => item.active && (item.role === "desenvolvedor" || item.role === "admin" || item.role === "atendente")),
+  const collectionOperators = useMemo(
+    () => availableUsers.filter((item) => item.active && item.canPerformCollections === true),
     [availableUsers],
+  );
+
+  const canHandleCollection = Boolean(
+    initial && profile && (
+      profile.role === "desenvolvedor" ||
+      profile.role === "admin" ||
+      (initial.assignedTo || initial.createdBy) === profile.uid
+    )
   );
 
   const selectedAvailability = availability[form.date];
   const hasStructuredAvailability = Boolean(selectedAvailability?.enabled && Array.isArray(selectedAvailability?.slots) && selectedAvailability.slots.length > 0);
+  const operatorAvailableDates = useMemo(() => {
+    if (!form.assignedTo) return sortedAvailableDates;
+    return sortedAvailableDates.filter((date) => {
+      const item = availability[date];
+      if (!item?.enabled) return false;
+      const slots = Array.isArray(item.slots) ? item.slots : [];
+      if (slots.length === 0) return true; // compatibilidade com dias liberados antes da V1.39.7
+      return availableTimesForUser(item, form.assignedTo, Number(form.durationMinutes || 30)).length > 0;
+    });
+  }, [availability, form.assignedTo, form.durationMinutes, sortedAvailableDates]);
   const allowedTimes = useMemo(
     () => hasStructuredAvailability ? availableTimesForUser(selectedAvailability, form.assignedTo, Number(form.durationMinutes || 30)) : [],
     [form.assignedTo, form.durationMinutes, hasStructuredAvailability, selectedAvailability],
@@ -348,7 +366,7 @@ export default function AppointmentModal({
   }
 
   async function refreshRamalStatus(silent = false): Promise<RamalStatus | null> {
-    if (!initial || !user) return null;
+    if (!initial || !user || !canHandleCollection) return null;
     if (!silent) setRamalLoading(true);
     try {
       const token = await getToken();
@@ -386,7 +404,7 @@ export default function AppointmentModal({
   }
 
   useEffect(() => {
-    if (!initial || !user) return;
+    if (!initial || !user || !canHandleCollection) return;
     let mounted = true;
 
     const load = async () => {
@@ -403,10 +421,11 @@ export default function AppointmentModal({
     };
     // o id identifica a abertura deste agendamento
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [initial?.id, user]);
+  }, [initial?.id, user, canHandleCollection]);
 
   async function openVTCall() {
     if (readOnly) return setError("Seu perfil possui acesso somente para consulta.");
+    if (!canHandleCollection) return setError(`Esta coleta está atribuída a ${initial?.assignedToName || "outro operador"}. Somente o operador responsável ou a gestão pode iniciar a ligação.`);
     const phone = cleanPhone(form.phone);
     if (!phone) return setError("Informe um telefone válido antes de iniciar a ligação.");
     if (!initial) return setError("Salve o agendamento antes de iniciar uma ligação.");
@@ -477,7 +496,7 @@ export default function AppointmentModal({
     setSaving(true);
     try {
       const cleanedPhone = cleanPhone(form.phone);
-      const selectedResponsible = operationalUsers.find((item) => item.uid === form.assignedTo);
+      const selectedResponsible = collectionOperators.find((item) => item.uid === form.assignedTo);
       const payload = {
         ...form,
         assignedToName: selectedResponsible?.name || form.assignedToName || profile?.name || "",
@@ -609,7 +628,7 @@ export default function AppointmentModal({
             <label>Telefone atualizado *</label>
             <div className="phone-field-wrap">
               <input className="input" disabled={readOnly} value={form.phone} onChange={(e) => setForm({ ...form, phone: cleanPhone(e.target.value) })} placeholder="81999999999" />
-              {initial && !readOnly && (
+              {initial && !readOnly && canHandleCollection && (
                 <button
                   type="button"
                   className="phone-vtcall-btn"
@@ -629,7 +648,7 @@ export default function AppointmentModal({
           </div>
         </div>
 
-        {initial && (
+        {initial && canHandleCollection && (
           <div className="ramal-status-bar">
             <div className="ramal-status-copy">
               <PhoneCall size={15} />
@@ -642,6 +661,17 @@ export default function AppointmentModal({
           </div>
         )}
 
+        {initial && !canHandleCollection && (
+          <div className="info-note">Esta coleta está atribuída a <strong>{initial.assignedToName || initial.createdByName || "outro operador"}</strong>. Você pode consultar/editar o agendamento, mas a ligação VTCall e o envio operacional ao SGA ficam com o operador responsável ou com a gestão.</div>
+        )}
+
+        {initial && (
+          <div className="appointment-origin-grid">
+            <div><small>Agendado por</small><strong>{initial.createdByName || "—"}</strong></div>
+            <div><small>Operador da coleta</small><strong>{initial.assignedToName || initial.createdByName || "—"}</strong></div>
+          </div>
+        )}
+
         <div className="field">
           <label>Responsável pela coleta *</label>
           <select
@@ -650,24 +680,30 @@ export default function AppointmentModal({
             value={form.assignedTo}
             onChange={(e) => {
               const assignedTo = e.target.value;
-              const selected = operationalUsers.find((item) => item.uid === assignedTo);
-              const nextTimes = Array.isArray(availability[form.date]?.slots) && availability[form.date]!.slots!.length > 0
-                ? availableTimesForUser(availability[form.date], assignedTo, Number(form.durationMinutes || 30))
+              const selected = collectionOperators.find((item) => item.uid === assignedTo);
+              const candidateDates = sortedAvailableDates.filter((date) => {
+                const item = availability[date];
+                const slots = Array.isArray(item?.slots) ? item!.slots! : [];
+                return Boolean(item?.enabled && (slots.length === 0 || availableTimesForUser(item, assignedTo, Number(form.durationMinutes || 30)).length > 0));
+              });
+              const nextDate = candidateDates.includes(form.date) ? form.date : (candidateDates[0] || form.date);
+              const nextTimes = Array.isArray(availability[nextDate]?.slots) && availability[nextDate]!.slots!.length > 0
+                ? availableTimesForUser(availability[nextDate], assignedTo, Number(form.durationMinutes || 30))
                 : [];
-              setForm({ ...form, assignedTo, assignedToName: selected?.name || "", time: nextTimes.length > 0 && !nextTimes.includes(form.time) ? nextTimes[0] : form.time });
+              setForm({ ...form, assignedTo, assignedToName: selected?.name || "", date: nextDate, time: nextTimes.length > 0 && !nextTimes.includes(form.time) ? nextTimes[0] : form.time });
             }}
           >
-            <option value="">Selecione o responsável</option>
-            {operationalUsers.map((item) => (
+            <option value="">Selecione o operador da coleta</option>
+            {collectionOperators.map((item) => (
               <option key={item.uid} value={item.uid}>
                 {item.name}{item.department ? ` • ${item.department}` : ""}
               </option>
             ))}
-            {form.assignedTo && !operationalUsers.some((item) => item.uid === form.assignedTo) && (
+            {form.assignedTo && !collectionOperators.some((item) => item.uid === form.assignedTo) && (
               <option value={form.assignedTo}>{form.assignedToName || "Responsável atual"}</option>
             )}
           </select>
-          <small className="field-help">É permitido ter várias coletas no mesmo dia e até no mesmo horário, desde que sejam atribuídas a responsáveis diferentes.</small>
+          <small className="field-help">Este campo define quem realizará a ligação/coleta. Quem está criando o agendamento é registrado automaticamente como “Agendado por”.</small>
         </div>
 
         <div className="grid-3">
@@ -687,12 +723,12 @@ export default function AppointmentModal({
                 {initial && initial.date && !sortedAvailableDates.includes(initial.date) && (
                   <option value={initial.date}>{initial.date.split("-").reverse().join("/")} • data atual (fechada)</option>
                 )}
-                {sortedAvailableDates.map((date) => (
+                {operatorAvailableDates.map((date) => (
                   <option key={date} value={date}>{date.split("-").reverse().join("/")}</option>
                 ))}
               </select>
             )}
-            {!developerOverride && !readOnly && <small className="field-help">Somente dias liberados por Eventos/Administrativo aparecem para novos agendamentos.</small>}
+            {!developerOverride && !readOnly && <small className="field-help">Os dias disponíveis vêm da agenda dos operadores de coleta, independentemente de quem está realizando o agendamento.</small>}
             {developerOverride && !readOnly && <small className="field-help">Acesso Desenvolvedor: você pode usar qualquer data, inclusive fora da disponibilidade publicada.</small>}
           </div>
           <div className="field">
@@ -789,7 +825,7 @@ export default function AppointmentModal({
           </div>
         )}
 
-        {initial && !readOnly && (
+        {initial && !readOnly && canHandleCollection && (
           <div className="sga-transfer-card">
             <div className="sga-transfer-head">
               <div>

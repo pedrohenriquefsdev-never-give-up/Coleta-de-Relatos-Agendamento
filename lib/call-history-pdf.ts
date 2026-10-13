@@ -97,6 +97,7 @@ export async function buildCallHistoryPdf({
   write(`E-mail: ${safePdfText(appointment.email)}`);
   write(`Agendamento: ${safePdfText(appointment.date)} ${safePdfText(appointment.time)}`);
   write(`Responsável pela coleta: ${safePdfText(appointment.assignedToName || appointment.createdByName || "")}`);
+  write(`Agendado por: ${safePdfText(appointment.createdByName || "")}`);
   write(`Status: ${safePdfText(appointment.status)}`);
   if (appointment.notes) write(`Observações do agendamento: ${safePdfText(appointment.notes)}`);
 

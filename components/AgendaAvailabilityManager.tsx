@@ -29,8 +29,8 @@ export default function AgendaAvailabilityManager({
   const [message, setMessage] = useState("");
   const [messageKind, setMessageKind] = useState<"info" | "error">("info");
 
-  const operationalUsers = useMemo(
-    () => users.filter((item) => item.active && (item.role === "desenvolvedor" || item.role === "admin" || item.role === "atendente")),
+  const collectionOperators = useMemo(
+    () => users.filter((item) => item.active && item.canPerformCollections === true),
     [users],
   );
   const month = useMemo(() => addMonths(startOfMonth(new Date()), monthOffset), [monthOffset]);
@@ -95,7 +95,7 @@ export default function AgendaAvailabilityManager({
         <div className="panel-head availability-head">
           <div>
             <h2>Disponibilidade da agenda</h2>
-            <small>Defina os dias, responsáveis e faixas de horário em que o Atendimento poderá agendar coletas.</small>
+            <small>Defina os dias, operadores da coleta e faixas de horário que poderão ser usados pelo Atendimento nos agendamentos.</small>
           </div>
           <div className="toolbar">
             <button className="btn icon-only" onClick={() => setMonthOffset((v) => v - 1)} title="Mês anterior"><ChevronLeft size={16} /></button>
@@ -163,13 +163,14 @@ export default function AgendaAvailabilityManager({
               {slots.map((slot, index) => (
                 <div className="availability-slot-row" key={index}>
                   <div className="field">
-                    <label>Responsável</label>
+                    <label>Operador da coleta</label>
                     <select className="select" value={slot.assignedTo} onChange={(e) => {
-                      const selected = operationalUsers.find((item) => item.uid === e.target.value);
-                      updateSlot(index, { assignedTo: e.target.value, assignedToName: selected?.name || "" });
+                      const selected = collectionOperators.find((item) => item.uid === e.target.value);
+                      updateSlot(index, { assignedTo: e.target.value, assignedToName: selected?.name || slot.assignedToName || "" });
                     }}>
                       <option value="">Selecione</option>
-                      {operationalUsers.map((item) => <option key={item.uid} value={item.uid}>{item.name}{item.department ? ` • ${item.department}` : ""}</option>)}
+                      {collectionOperators.map((item) => <option key={item.uid} value={item.uid}>{item.name}{item.department ? ` • ${item.department}` : ""}</option>)}
+                      {slot.assignedTo && !collectionOperators.some((item) => item.uid === slot.assignedTo) && <option value={slot.assignedTo}>{slot.assignedToName || "Operador atual"} • precisa marcar “Realiza coletas”</option>}
                     </select>
                   </div>
                   <div className="field"><label>Início</label><input className="input" type="time" value={slot.start} onChange={(e) => updateSlot(index, { start: e.target.value })} /></div>
@@ -179,7 +180,7 @@ export default function AgendaAvailabilityManager({
               ))}
             </div>
           )}
-          <div className="availability-footnote">Exemplo: um responsável pode ficar indisponível pela manhã e ter apenas 13:00-17:00 liberado. O Atendimento verá somente os horários permitidos para o responsável selecionado.</div>
+          <div className="availability-footnote">A disponibilidade pertence ao operador da coleta, não a quem cria o agendamento. Ex.: Samuel pode ter 13:00-17:00 liberado e Thamyres/Nataly poderão usar esses horários ao agendar uma coleta para ele.</div>
         </div>
       )}
     </div>

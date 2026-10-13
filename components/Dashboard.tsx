@@ -245,8 +245,8 @@ export default function Dashboard() {
               <option value="nao_compareceu">Não compareceu</option>
             </select>
             <select className="select table-filter" value={responsibleFilter} onChange={(e) => setResponsibleFilter(e.target.value)}>
-              <option value="todos">Todos os responsáveis</option>
-              {users.filter((u) => u.active && (u.role === "desenvolvedor" || u.role === "admin" || u.role === "atendente")).map((u) => (
+              <option value="todos">Todos os operadores</option>
+              {users.filter((u) => u.active && u.canPerformCollections === true).map((u) => (
                 <option key={u.uid} value={u.uid}>{u.name}</option>
               ))}
             </select>
@@ -271,7 +271,8 @@ export default function Dashboard() {
                 <th>Placa</th>
                 <th>Nome</th>
                 <th>Telefone</th>
-                <th>Responsável</th>
+                <th>Responsável pela coleta</th>
+                <th>Agendado por</th>
                 <th>Status</th>
                 <th>Ações</th>
               </tr>
@@ -287,6 +288,7 @@ export default function Dashboard() {
                     <td><strong>{a.fullName}</strong></td>
                     <td>{a.phone}</td>
                     <td>{a.assignedToName || a.createdByName || "—"}</td>
+                    <td>{a.createdByName || "—"}</td>
                     <td><span className={`pill status-${a.status}`}>{appointmentStatusLabels[a.status] || a.status.replaceAll("_", " ")}</span></td>
                     <td>
                       <div className="row-actions">
@@ -303,7 +305,7 @@ export default function Dashboard() {
                   </tr>
                 ))}
               {filtered.length === 0 && (
-                <tr><td colSpan={8}><div className="empty compact-empty">Nenhum agendamento encontrado com os filtros selecionados.</div></td></tr>
+                <tr><td colSpan={9}><div className="empty compact-empty">Nenhum agendamento encontrado com os filtros selecionados.</div></td></tr>
               )}
             </tbody>
           </table>
@@ -499,7 +501,8 @@ export default function Dashboard() {
                             <div className="appointment-time">{a.time}</div>
                             <Plate value={a.plate} compact />
                             <span>{a.fullName}</span>
-                            <small className="appointment-responsible">{a.assignedToName || a.createdByName || "Sem responsável"}</small>
+                            <small className="appointment-responsible">Coleta: {a.assignedToName || a.createdByName || "Sem operador"}</small>
+                            <small className="appointment-scheduler">Agendado por: {a.createdByName || "—"}</small>
                           </div>
                         ))}
                       </div>

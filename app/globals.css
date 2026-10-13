@@ -2090,3 +2090,6 @@
   .sga-transfer-actions .btn{width:100%;justify-content:center}
   .sga-status-grid-v1398,.sga-catalog-grid-v1398,.sga-event-card-v1398{grid-template-columns:1fr}
 }
+
+/* V1.39.9 — autoria do agendamento x operador da coleta */
+.appointment-origin-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px;margin:2px 0 4px}.appointment-origin-grid>div{border:1px solid var(--line);background:var(--surface-2);border-radius:12px;padding:10px 12px;display:flex;flex-direction:column;gap:3px}.appointment-origin-grid small{font-size:10px;text-transform:uppercase;letter-spacing:.06em;color:var(--muted)}.appointment-origin-grid strong{font-size:12px}.appointment-scheduler{display:block;margin-top:2px;color:var(--muted);font-size:10px}@media(max-width:720px){.appointment-origin-grid{grid-template-columns:1fr}}

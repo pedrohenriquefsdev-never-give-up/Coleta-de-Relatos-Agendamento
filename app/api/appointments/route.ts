@@ -48,11 +48,12 @@ async function validateSchedule(payload: any, ignoreId?: string) {
   }
 }
 
-async function resolveResponsible(payload: any) {
+async function resolveResponsible(payload: any, legacyResponsibleUid = "") {
   const snap = await adminDb().collection("users").doc(payload.assignedTo).get();
   if (!snap.exists || snap.data()?.active === false) throw new Error("INVALID_RESPONSIBLE");
   const data = snap.data() as any;
-  if (!isDeveloper({ uid: payload.assignedTo, role: data.role }) && data.role !== "admin" && data.role !== "atendente") throw new Error("INVALID_RESPONSIBLE");
+  const isLegacySameResponsible = Boolean(legacyResponsibleUid && legacyResponsibleUid === payload.assignedTo);
+  if (data.canPerformCollections !== true && !isLegacySameResponsible) throw new Error("INVALID_RESPONSIBLE");
   return {
     ...payload,
     assignedToName: String(data.name || data.email || payload.assignedToName || ""),
@@ -126,7 +127,7 @@ export async function POST(req: NextRequest) {
     if (code === "SCHEDULE_NOT_AVAILABLE") return Response.json({ error: "Este responsável não está disponível nesse dia e horário." }, { status: 409 });
     if (code === "SCHEDULE_CONFLICT") return Response.json({ error: "O responsável já possui outra coleta nesse período." }, { status: 409 });
     if (code === "INVALID_FIELDS") return Response.json({ error: "Preencha corretamente os campos obrigatórios." }, { status: 400 });
-    if (code === "INVALID_RESPONSIBLE") return Response.json({ error: "O responsável selecionado não está disponível para receber coletas." }, { status: 400 });
+    if (code === "INVALID_RESPONSIBLE") return Response.json({ error: "O usuário selecionado não está marcado como operador de coleta." }, { status: 400 });
     const status = code === "UNAUTHORIZED" ? 401 : code === "FORBIDDEN" ? 403 : 500;
     const technical = safeServerError(e);
     return Response.json({ error: "Não foi possível criar o agendamento.", technical: status === 500 ? technical.message : undefined }, { status });
@@ -145,7 +146,7 @@ export async function PATCH(req: NextRequest) {
     if (!currentSnap.exists) return Response.json({ error: "Agendamento não encontrado." }, { status: 404 });
     const current = currentSnap.data() as any;
     let payload = validatePayload(body);
-    payload = await resolveResponsible(payload);
+    payload = await resolveResponsible(payload, String(current.assignedTo || current.createdBy || ""));
     const scheduleChanged = payload.date !== current.date || payload.time !== current.time || payload.assignedTo !== current.assignedTo || payload.durationMinutes !== Number(current.durationMinutes || 30);
     if (!isDeveloper(actor) && scheduleChanged) await validateSchedule(payload, id);
     await ref.update({ ...payload, updatedAt: FieldValue.serverTimestamp() });
@@ -156,7 +157,7 @@ export async function PATCH(req: NextRequest) {
     if (code === "SCHEDULE_NOT_AVAILABLE") return Response.json({ error: "Este responsável não está disponível nesse dia e horário." }, { status: 409 });
     if (code === "SCHEDULE_CONFLICT") return Response.json({ error: "O responsável já possui outra coleta nesse período." }, { status: 409 });
     if (code === "INVALID_FIELDS") return Response.json({ error: "Preencha corretamente os campos obrigatórios." }, { status: 400 });
-    if (code === "INVALID_RESPONSIBLE") return Response.json({ error: "O responsável selecionado não está disponível para receber coletas." }, { status: 400 });
+    if (code === "INVALID_RESPONSIBLE") return Response.json({ error: "O usuário selecionado não está marcado como operador de coleta." }, { status: 400 });
     const status = code === "UNAUTHORIZED" ? 401 : code === "FORBIDDEN" ? 403 : 500;
     const technical = safeServerError(e);
     return Response.json({ error: "Não foi possível atualizar o agendamento.", technical: status === 500 ? technical.message : undefined }, { status });

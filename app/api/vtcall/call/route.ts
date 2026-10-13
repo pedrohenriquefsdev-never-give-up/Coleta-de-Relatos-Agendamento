@@ -25,6 +25,20 @@ export async function POST(req: NextRequest) {
     const appointmentId = String(body.appointmentId || "").trim();
     if (phone.length < 8) return Response.json({ error: "Telefone inválido." }, { status: 400 });
 
+    let appointmentSnap: any = null;
+    if (appointmentId) {
+      appointmentSnap = await adminDb().collection("appointments").doc(appointmentId).get();
+      if (!appointmentSnap.exists) return Response.json({ error: "Agendamento não encontrado." }, { status: 404 });
+      const appointment = appointmentSnap.data() as any;
+      const assignedOperator = String(appointment.assignedTo || appointment.createdBy || "");
+      const managementOverride = user.role === "admin" || isPortalDeveloperUid(user.uid);
+      if (!managementOverride && assignedOperator !== user.uid) {
+        return Response.json({ error: `Esta coleta está atribuída a ${appointment.assignedToName || appointment.createdByName || "outro operador"}.` }, { status: 403 });
+      }
+    } else if (user.role === "atendente") {
+      return Response.json({ error: "A ligação deve ser iniciada a partir de um agendamento atribuído a você." }, { status: 400 });
+    }
+
     const cred = await adminDb().collection("vtcallCredentials").doc(user.uid).get();
     if (!cred.exists || !cred.data()?.extension) return Response.json({ error: "Seu ramal VTCall ainda não foi configurado." }, { status: 409 });
 
@@ -153,11 +167,11 @@ export async function POST(req: NextRequest) {
     let appointmentDetails: { fullName?: string; plate?: string } = {};
     if (appointmentId) {
       const appointmentRef = adminDb().collection("appointments").doc(appointmentId);
-      const appointmentSnap = await appointmentRef.get();
-      if (appointmentSnap.exists) {
+      const freshAppointmentSnap = appointmentSnap?.exists ? appointmentSnap : await appointmentRef.get();
+      if (freshAppointmentSnap.exists) {
         appointmentDetails = {
-          fullName: String(appointmentSnap.data()?.fullName || ""),
-          plate: String(appointmentSnap.data()?.plate || ""),
+          fullName: String(freshAppointmentSnap.data()?.fullName || ""),
+          plate: String(freshAppointmentSnap.data()?.plate || ""),
         };
       }
       await appointmentRef.set({

@@ -80,6 +80,15 @@ export async function PATCH(req: NextRequest) {
       return Response.json({ error: "Existe um período inválido. Confira responsável, horário inicial e horário final." }, { status: 400 });
     }
 
+    if (normalizedSlots && normalizedSlots.length > 0) {
+      const operatorIds = Array.from(new Set(normalizedSlots.map((slot) => slot.assignedTo)));
+      const operatorDocs = await Promise.all(operatorIds.map((uid) => adminDb().collection("users").doc(uid).get()));
+      const invalidOperator = operatorDocs.find((snap) => !snap.exists || snap.data()?.active === false || snap.data()?.canPerformCollections !== true);
+      if (invalidOperator) {
+        return Response.json({ error: "A disponibilidade só pode ser atribuída a usuários marcados como ‘Realiza coletas de relatos’." }, { status: 400 });
+      }
+    }
+
     if (normalizedSlots) {
       for (let i = 0; i < normalizedSlots.length; i++) {
         for (let j = i + 1; j < normalizedSlots.length; j++) {

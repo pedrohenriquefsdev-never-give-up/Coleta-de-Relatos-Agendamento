@@ -22,6 +22,7 @@ export interface AppUser {
   vtcallExtension?: string;
   cpfLast4?: string;
   canManageAgendaAvailability?: boolean;
+  canPerformCollections?: boolean;
   createdAt?: unknown;
   lastAccessAt?: unknown;
 }

@@ -86,6 +86,12 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ ui
       details.canManageAgendaAvailability = body.canManageAgendaAvailability;
     }
 
+
+    if (typeof body.canPerformCollections === "boolean") {
+      updates.canPerformCollections = body.canPerformCollections;
+      details.canPerformCollections = body.canPerformCollections;
+    }
+
     if (typeof body.cpf === "string" && body.cpf.trim()) {
       const cpf = body.cpf.replace(/\D/g, "");
       if (cpf.length !== 11) return Response.json({ error: "O novo CPF precisa ter 11 dígitos." }, { status: 400 });

@@ -31,6 +31,7 @@ export async function POST(req: NextRequest) {
       department: String(body.department).trim(),
       active: true,
       canManageAgendaAvailability: body.canManageAgendaAvailability === true,
+      canPerformCollections: body.canPerformCollections === true,
       cpfLast4: cpf.slice(-4),
       createdAt: FieldValue.serverTimestamp(),
       createdBy: actor.uid,
@@ -42,7 +43,7 @@ export async function POST(req: NextRequest) {
       userEmail: actor.email,
       action: "USER_CREATED",
       targetId: created.uid,
-      details: { createdUserName: body.name, role: body.role, department: String(body.department).trim(), canManageAgendaAvailability: body.canManageAgendaAvailability === true },
+      details: { createdUserName: body.name, role: body.role, department: String(body.department).trim(), canManageAgendaAvailability: body.canManageAgendaAvailability === true, canPerformCollections: body.canPerformCollections === true },
       createdAt: FieldValue.serverTimestamp(),
     });
 
