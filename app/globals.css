@@ -2044,3 +2044,49 @@
 .sga-checks span{padding:6px 9px;border-radius:999px;font-size:8.5px;font-weight:800;border:1px solid var(--line)}
 .sga-checks .ok{background:rgba(42,150,88,.1);color:#2c8d56}
 .sga-checks .fail{background:rgba(190,70,70,.09);color:#b44848}
+
+/* V1.39.8 - SGA operacional */
+.sga-transfer-card{
+  border:1px solid var(--line);
+  border-radius:16px;
+  background:var(--surface-2);
+  overflow:hidden;
+}
+.sga-transfer-head{
+  display:flex;
+  justify-content:space-between;
+  align-items:center;
+  gap:12px;
+  padding:12px;
+  border-bottom:1px solid var(--line);
+}
+.sga-transfer-head>div{display:flex;align-items:center;gap:9px;min-width:0}
+.sga-transfer-head>div>svg{color:var(--yellow);flex:none}
+.sga-transfer-head span{display:flex;flex-direction:column;min-width:0}
+.sga-transfer-head strong{font-size:11px}
+.sga-transfer-head small{font-size:9px;color:var(--muted);margin-top:2px}
+.sga-transfer-grid{display:grid;grid-template-columns:1.35fr 1fr;gap:10px;padding:12px 12px 0}
+.sga-transfer-card>.field{padding:12px 12px 0}
+.sga-observation{min-height:104px}
+.sga-transfer-actions{display:flex;justify-content:flex-end;gap:7px;padding:12px}
+.sga-transfer-message{margin:0 12px 12px}
+.sga-last-upload{margin:12px 12px 0;border:1px solid rgba(48,155,91,.24);background:rgba(48,155,91,.08);border-radius:12px;padding:9px 10px;display:flex;flex-direction:column;gap:3px}
+.sga-last-upload strong{font-size:9.5px;color:#3d9d67}
+.sga-last-upload span{font-size:9px;color:var(--muted)}
+.sga-inline-warning{margin:12px 12px 0}
+.sga-permission-note{margin-top:12px}
+.sga-status-grid-v1398{grid-template-columns:1.25fr repeat(4,minmax(0,1fr))}
+.sga-catalog-grid-v1398{grid-template-columns:repeat(5,minmax(0,1fr))}
+.sga-event-card-v1398{grid-template-columns:minmax(210px,1.4fr) repeat(5,minmax(110px,1fr))}
+@media(max-width:1100px){
+  .sga-catalog-grid-v1398{grid-template-columns:repeat(2,minmax(0,1fr))}
+  .sga-event-card-v1398{grid-template-columns:1fr 1fr 1fr}
+  .sga-event-card-v1398>div{grid-column:1/-1}
+}
+@media(max-width:720px){
+  .sga-transfer-head{align-items:flex-start;flex-direction:column}
+  .sga-transfer-grid{grid-template-columns:1fr}
+  .sga-transfer-actions{justify-content:stretch;flex-direction:column}
+  .sga-transfer-actions .btn{width:100%;justify-content:center}
+  .sga-status-grid-v1398,.sga-catalog-grid-v1398,.sga-event-card-v1398{grid-template-columns:1fr}
+}

@@ -11,7 +11,13 @@ async function parseResponse(response: Response) {
   let data: any = null;
   try { data = text ? JSON.parse(text) : null; } catch { data = text; }
   if (!response.ok) {
-    const message = typeof data === "object" && data?.mensagem ? data.mensagem : typeof data === "object" && data?.message ? data.message : String(text || `HTTP ${response.status}`);
+    const message = typeof data === "object" && data?.mensagem
+      ? data.mensagem
+      : typeof data === "object" && data?.message
+        ? data.message
+        : typeof data === "object" && data?.error
+          ? data.error
+          : String(text || `HTTP ${response.status}`);
     const error: any = new Error(message);
     error.status = response.status;
     error.data = data;
@@ -52,7 +58,7 @@ export async function sgaFetch(path: string, init: RequestInit = {}, retry = tru
       Authorization: `Bearer ${token}`,
     },
     cache: "no-store",
-    signal: init.signal || AbortSignal.timeout(15000),
+    signal: init.signal || AbortSignal.timeout(20000),
   });
   if (response.status === 401 && retry) {
     cachedUserToken = "";
@@ -65,12 +71,55 @@ export async function sgaFetch(path: string, init: RequestInit = {}, retry = tru
 export async function listSgaDepartments() {
   return sgaFetch("listar/departamento/ativo");
 }
+
 export async function listSgaStatuses() {
   return sgaFetch("listar/status-atendimento/ativo");
 }
+
 export async function listSgaTypes() {
   return sgaFetch("listar/tipo-atendimento/ativo");
 }
+
+export async function listSgaEventSituations() {
+  return sgaFetch("situacao-evento/listar/ativo");
+}
+
+export async function listSgaPhotoTypes() {
+  return sgaFetch("listar/tipo-foto/ativo");
+}
+
 export async function listSgaEventsByVehicle(plateOrCode: string) {
   return sgaFetch(`listar/evento-veiculo/${encodeURIComponent(plateOrCode)}`);
+}
+
+export async function uploadSgaEventDocument({
+  vehicleCode,
+  eventCode,
+  photoTypeCode,
+  filename,
+  base64,
+  observation,
+}: {
+  vehicleCode: number;
+  eventCode: number;
+  photoTypeCode: number;
+  filename: string;
+  base64: string;
+  observation?: string;
+}) {
+  return sgaFetch("veiculo/foto/cadastrar", {
+    method: "POST",
+    body: JSON.stringify({
+      codigo_veiculo: vehicleCode,
+      codigo_evento: eventCode,
+      foto: [
+        {
+          nome_arquivo: filename,
+          codigo_tipo: photoTypeCode,
+          binario: base64,
+          ...(observation ? { observacao: observation } : {}),
+        },
+      ],
+    }),
+  });
 }

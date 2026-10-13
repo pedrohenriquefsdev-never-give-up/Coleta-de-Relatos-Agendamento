@@ -38,6 +38,7 @@ export interface Appointment {
   durationMinutes: number;
   status: AppointmentStatus;
   notes?: string;
+  sgaObservation?: string;
   assignedTo?: string;
   assignedToName?: string;
   assignedDepartment?: string;
@@ -45,6 +46,22 @@ export interface Appointment {
   createdByName?: string;
   createdAt?: unknown;
   updatedAt?: unknown;
+  sga?: {
+    lastUpload?: {
+      eventCode?: string;
+      protocol?: string;
+      vehicleCode?: string;
+      photoTypeCode?: string;
+      photoTypeName?: string;
+      filename?: string;
+      observation?: string;
+      attemptCount?: number;
+      latestAttemptId?: string;
+      sentBy?: string;
+      sentByName?: string;
+      sentAt?: unknown;
+    };
+  };
   call?: {
     provider?: "vtcall";
     callId?: string;

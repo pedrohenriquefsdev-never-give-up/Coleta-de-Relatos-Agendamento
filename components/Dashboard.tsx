@@ -72,6 +72,7 @@ const actions: Record<string, string> = {
   USER_PHOTO_UPDATED_BY_DEVELOPER: "Desenvolvedor alterou foto de usuário",
   VTCALL_CREDENTIALS_UPDATED: "Atualizou configuração VTCall",
   VTCALL_CALL_REQUESTED: "Solicitou ligação VTCall",
+  SGA_DOCUMENT_SENT: "Enviou PDF da coleta ao SGA",
   AGENDA_DAY_OPENED: "Liberou dia na agenda",
   AGENDA_AVAILABILITY_UPDATED: "Atualizou horários da agenda",
   AGENDA_DAY_CLOSED: "Fechou dia na agenda",

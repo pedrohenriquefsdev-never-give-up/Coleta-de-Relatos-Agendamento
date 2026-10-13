@@ -72,6 +72,7 @@ function validatePayload(body: any) {
     durationMinutes: Number(body.durationMinutes || 30),
     status: String(body.status || "agendado") as AppointmentStatus,
     notes: String(body.notes || ""),
+    sgaObservation: String(body.sgaObservation || "").slice(0, 4000),
     assignedTo: String(body.assignedTo || "").trim(),
     assignedToName: String(body.assignedToName || "").trim(),
     assignedDepartment: String(body.assignedDepartment || "").trim(),
@@ -98,6 +99,7 @@ async function audit(actor: any, action: string, targetId: string, payload: any)
       assignedToName: payload.assignedToName,
       date: payload.date,
       time: payload.time,
+      hasSgaObservation: Boolean(payload.sgaObservation),
     },
     createdAt: FieldValue.serverTimestamp(),
   });

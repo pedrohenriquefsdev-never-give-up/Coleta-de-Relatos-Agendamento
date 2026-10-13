@@ -1,7 +1,14 @@
 import { NextRequest } from "next/server";
 import { requireAdmin } from "@/lib/server-auth";
 import { sgaConfigStatus } from "@/lib/sga-env";
-import { authenticateSga, listSgaDepartments, listSgaStatuses, listSgaTypes } from "@/lib/sga-client";
+import {
+  authenticateSga,
+  listSgaDepartments,
+  listSgaStatuses,
+  listSgaTypes,
+  listSgaEventSituations,
+  listSgaPhotoTypes,
+} from "@/lib/sga-client";
 import { safeServerError } from "@/lib/server-error";
 
 export const runtime = "nodejs";
@@ -19,10 +26,12 @@ export async function GET(req: NextRequest) {
     if (!config.configured) return Response.json({ ok: false, config, error: "Integração SGA ainda não configurada na Vercel." }, { status: 503 });
 
     await authenticateSga(true);
-    const [departmentsCheck, statusesCheck, typesCheck] = await Promise.all([
+    const [departmentsCheck, statusesCheck, typesCheck, eventSituationsCheck, photoTypesCheck] = await Promise.all([
       check(listSgaDepartments),
       check(listSgaStatuses),
       check(listSgaTypes),
+      check(listSgaEventSituations),
+      check(listSgaPhotoTypes),
     ]);
 
     return Response.json({
@@ -32,14 +41,23 @@ export async function GET(req: NextRequest) {
       departments: departmentsCheck.data,
       statuses: statusesCheck.data,
       types: typesCheck.data,
+      eventSituations: eventSituationsCheck.data,
+      photoTypes: photoTypesCheck.data,
       checks: {
         departments: { ok: departmentsCheck.ok, error: departmentsCheck.error },
         statuses: { ok: statusesCheck.ok, error: statusesCheck.error },
         types: { ok: typesCheck.ok, error: typesCheck.error },
+        eventSituations: { ok: eventSituationsCheck.ok, error: eventSituationsCheck.error },
+        photoTypes: { ok: photoTypesCheck.ok, error: photoTypesCheck.error },
       },
     });
   } catch (e: any) {
     const technical = safeServerError(e);
-    return Response.json({ ok: false, config: sgaConfigStatus(), error: "Não foi possível autenticar no SGA.", technical: technical.message }, { status: e?.message === "UNAUTHORIZED" ? 401 : e?.message === "FORBIDDEN" ? 403 : 502 });
+    return Response.json({
+      ok: false,
+      config: sgaConfigStatus(),
+      error: "Não foi possível autenticar no SGA.",
+      technical: technical.message,
+    }, { status: e?.message === "UNAUTHORIZED" ? 401 : e?.message === "FORBIDDEN" ? 403 : 502 });
   }
 }

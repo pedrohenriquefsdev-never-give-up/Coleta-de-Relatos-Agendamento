@@ -1,7 +1,7 @@
 "use client";
 
 import { format } from "date-fns";
-import { Download, History, PhoneCall, RefreshCw, Trash2 } from "lucide-react";
+import { Copy, Database, Download, History, PhoneCall, RefreshCw, Send, Trash2 } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 import { useSession } from "./AuthGate";
 import Modal from "./Modal";
@@ -43,6 +43,26 @@ type CallAttempt = {
   requestedAt: string | null;
 };
 
+type SgaEvent = {
+  codigo_evento?: string | number;
+  codigo_veiculo?: string | number;
+  protocolo?: string | number;
+  placa?: string;
+  nome_associado?: string;
+  situacao_evento?: string;
+  descricao_motivo?: string;
+};
+
+type SgaPhotoType = {
+  codigo_tipofoto?: string | number;
+  codigo?: string | number;
+  descricao?: string;
+  nome?: string;
+};
+
+const sgaEventKey = (event: SgaEvent) => `${String(event.codigo_evento ?? "")}:${String(event.codigo_veiculo ?? "")}`;
+const sgaPhotoTypeCode = (item: SgaPhotoType) => String(item.codigo_tipofoto ?? item.codigo ?? "");
+
 export default function AppointmentModal({
   initial,
   defaultDate,
@@ -78,6 +98,15 @@ export default function AppointmentModal({
   const [ramalLoading, setRamalLoading] = useState(false);
   const [callAttempts, setCallAttempts] = useState<CallAttempt[]>([]);
   const [historyLoading, setHistoryLoading] = useState(false);
+  const [sgaLoading, setSgaLoading] = useState(false);
+  const [sgaEvents, setSgaEvents] = useState<SgaEvent[]>([]);
+  const [sgaPhotoTypes, setSgaPhotoTypes] = useState<SgaPhotoType[]>([]);
+  const [selectedSgaEvent, setSelectedSgaEvent] = useState("");
+  const [selectedSgaPhotoType, setSelectedSgaPhotoType] = useState("");
+  const [sgaCatalogWarning, setSgaCatalogWarning] = useState("");
+  const [sgaMessage, setSgaMessage] = useState("");
+  const [sendingSga, setSendingSga] = useState(false);
+  const [lastSgaUpload, setLastSgaUpload] = useState<any>(initial?.sga?.lastUpload || null);
   const sortedAvailableDates = useMemo(() => Array.from(new Set(availableDates)).sort(), [availableDates]);
   const todayLocal = format(new Date(), "yyyy-MM-dd");
   const firstAvailableDate = sortedAvailableDates.find((date) => date >= todayLocal) || sortedAvailableDates[0] || "";
@@ -94,6 +123,7 @@ export default function AppointmentModal({
     assignedToName: initial?.assignedToName || initial?.createdByName || profile?.name || "",
     status: ((initial?.status === "atendido" ? "concluido" : initial?.status) || "agendado") as AppointmentStatus,
     notes: initial?.notes || "",
+    sgaObservation: initial?.sgaObservation || initial?.sga?.lastUpload?.observation || "",
   });
 
   const title = useMemo(() => (initial ? `Agendamento • ${initial.plate}` : "Novo agendamento"), [initial]);
@@ -190,8 +220,10 @@ export default function AppointmentModal({
     setError("");
     try {
       const token = await getToken();
-      const response = await fetch(`/api/reports/call-history/pdf?appointmentId=${encodeURIComponent(initial.id)}`, {
-        headers: { Authorization: `Bearer ${token}` },
+      const response = await fetch(`/api/reports/call-history/pdf`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+        body: JSON.stringify({ appointmentId: initial.id, observation: form.sgaObservation }),
         cache: "no-store",
       });
       if (!response.ok) {
@@ -209,6 +241,109 @@ export default function AppointmentModal({
       URL.revokeObjectURL(url);
     } catch (e) {
       setError(e instanceof Error ? e.message : "Não foi possível gerar o PDF.");
+    }
+  }
+
+  async function loadSgaContext() {
+    if (!initial || !user) return;
+    setSgaLoading(true);
+    setSgaCatalogWarning("");
+    setSgaMessage("");
+    setError("");
+    try {
+      const token = await getToken();
+      const plate = cleanPlate(initial.plate || form.plate);
+      const [eventResponse, catalogResponse] = await Promise.all([
+        fetch(`/api/sga/event?plate=${encodeURIComponent(plate)}&t=${Date.now()}`, {
+          headers: { Authorization: `Bearer ${token}` },
+          cache: "no-store",
+        }),
+        fetch(`/api/sga/catalogs?t=${Date.now()}`, {
+          headers: { Authorization: `Bearer ${token}` },
+          cache: "no-store",
+        }),
+      ]);
+
+      const eventData = await eventResponse.json().catch(() => ({}));
+      const catalogData = await catalogResponse.json().catch(() => ({}));
+      if (!eventResponse.ok) throw new Error(eventData.error || "Não foi possível localizar o evento no SGA.");
+      if (!catalogResponse.ok) throw new Error(catalogData.error || "Não foi possível carregar as classificações do SGA.");
+
+      const events = Array.isArray(eventData.data?.eventos) ? eventData.data.eventos as SgaEvent[] : [];
+      const photoTypes = Array.isArray(catalogData.photoTypes) ? catalogData.photoTypes as SgaPhotoType[] : catalogData.photoTypes ? [catalogData.photoTypes as SgaPhotoType] : [];
+      setSgaEvents(events);
+      setSgaPhotoTypes(photoTypes);
+
+      if (!catalogData.checks?.photoTypes?.ok) {
+        setSgaCatalogWarning("O token não conseguiu listar as classificações de arquivo. Habilite Vistoria → listar tipo foto para realizar o upload.");
+      }
+
+      const previousEventKey = lastSgaUpload?.eventCode && lastSgaUpload?.vehicleCode
+        ? `${String(lastSgaUpload.eventCode)}:${String(lastSgaUpload.vehicleCode)}`
+        : "";
+      if (previousEventKey && events.some((item) => sgaEventKey(item) === previousEventKey)) setSelectedSgaEvent(previousEventKey);
+      else if (events.length === 1) setSelectedSgaEvent(sgaEventKey(events[0]));
+      else setSelectedSgaEvent("");
+
+      const previousType = String(lastSgaUpload?.photoTypeCode || "");
+      if (previousType && photoTypes.some((item) => sgaPhotoTypeCode(item) === previousType)) setSelectedSgaPhotoType(previousType);
+      else {
+        const suggested = photoTypes.find((item) => /document|relato|arquivo|evento/i.test(String(item.descricao || item.nome || "")));
+        setSelectedSgaPhotoType(suggested ? sgaPhotoTypeCode(suggested) : photoTypes.length === 1 ? sgaPhotoTypeCode(photoTypes[0]) : "");
+      }
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Não foi possível preparar a integração com o SGA.");
+    } finally {
+      setSgaLoading(false);
+    }
+  }
+
+  async function copySgaObservation() {
+    const text = form.sgaObservation.trim();
+    if (!text) return setError("Preencha a observação antes de copiar.");
+    try {
+      await navigator.clipboard.writeText(text);
+      setSgaMessage("Observação copiada.");
+    } catch {
+      setError("Não foi possível copiar a observação neste navegador.");
+    }
+  }
+
+  async function sendHistoryToSga() {
+    if (!initial || !user) return;
+    if (callAttempts.length === 0) return setError("Faça ao menos uma tentativa de ligação antes de enviar o histórico ao SGA.");
+    const event = sgaEvents.find((item) => sgaEventKey(item) === selectedSgaEvent);
+    if (!event) return setError("Selecione o evento correto do SGA.");
+    if (!selectedSgaPhotoType) return setError("Selecione a classificação do documento no SGA.");
+
+    const protocol = String(event.protocolo || "sem protocolo");
+    const confirmed = window.confirm(`Enviar o PDF desta coleta para o evento ${protocol}, placa ${cleanPlate(initial.plate)}?`);
+    if (!confirmed) return;
+
+    setSendingSga(true);
+    setSgaMessage("");
+    setError("");
+    try {
+      const token = await getToken();
+      const response = await fetch("/api/sga/send-document", {
+        method: "POST",
+        headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+        body: JSON.stringify({
+          appointmentId: initial.id,
+          eventCode: event.codigo_evento,
+          vehicleCode: event.codigo_veiculo,
+          photoTypeCode: selectedSgaPhotoType,
+          observation: form.sgaObservation,
+        }),
+      });
+      const data = await response.json().catch(() => ({}));
+      if (!response.ok) throw new Error(`${data.error || "Não foi possível enviar ao SGA."}${data.technical ? ` — ${data.technical}` : ""}`);
+      setLastSgaUpload(data.upload || null);
+      setSgaMessage(data.message || "PDF enviado ao SGA com sucesso.");
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Não foi possível enviar ao SGA.");
+    } finally {
+      setSendingSga(false);
     }
   }
 
@@ -651,6 +786,85 @@ export default function AppointmentModal({
                 ))}
               </div>
             )}
+          </div>
+        )}
+
+        {initial && !readOnly && (
+          <div className="sga-transfer-card">
+            <div className="sga-transfer-head">
+              <div>
+                <Database size={16} />
+                <span><strong>Enviar coleta ao SGA</strong><small>Localize o evento pela placa e anexe o PDF diretamente nele.</small></span>
+              </div>
+              <button type="button" className="btn compact" onClick={loadSgaContext} disabled={sgaLoading}>
+                <RefreshCw size={13} className={sgaLoading ? "spin-icon" : ""} /> {sgaLoading ? "Consultando..." : sgaEvents.length > 0 ? "Atualizar SGA" : "Localizar evento"}
+              </button>
+            </div>
+
+            {lastSgaUpload && (
+              <div className="sga-last-upload">
+                <strong>Último envio confirmado</strong>
+                <span>Protocolo {lastSgaUpload.protocol || "—"} • Evento {lastSgaUpload.eventCode || "—"} • {lastSgaUpload.filename || "PDF da coleta"}</span>
+              </div>
+            )}
+
+            {sgaCatalogWarning && <div className="info-note sga-inline-warning">{sgaCatalogWarning}</div>}
+
+            {sgaEvents.length > 0 && (
+              <div className="sga-transfer-grid">
+                <div className="field">
+                  <label>Evento / protocolo *</label>
+                  <select className="select" value={selectedSgaEvent} onChange={(e) => setSelectedSgaEvent(e.target.value)}>
+                    <option value="">Selecione o evento correto</option>
+                    {sgaEvents.map((event, index) => (
+                      <option key={`${sgaEventKey(event)}:${index}`} value={sgaEventKey(event)}>
+                        {event.protocolo || "Sem protocolo"} • {event.situacao_evento || "Sem situação"} • {event.descricao_motivo || "Sem motivo"}
+                      </option>
+                    ))}
+                  </select>
+                  {sgaEvents.length > 1 && <small className="field-help warning-text">Há mais de um evento para esta placa. Confirme o protocolo antes de enviar.</small>}
+                </div>
+
+                <div className="field">
+                  <label>Classificação do documento *</label>
+                  <select className="select" value={selectedSgaPhotoType} onChange={(e) => setSelectedSgaPhotoType(e.target.value)} disabled={sgaPhotoTypes.length === 0}>
+                    <option value="">Selecione a classificação</option>
+                    {sgaPhotoTypes.map((item, index) => (
+                      <option key={`${sgaPhotoTypeCode(item)}:${index}`} value={sgaPhotoTypeCode(item)}>
+                        {item.descricao || item.nome || `Código ${sgaPhotoTypeCode(item)}`}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              </div>
+            )}
+
+            <div className="field">
+              <label>Observação para o SGA</label>
+              <textarea
+                className="textarea sga-observation"
+                value={form.sgaObservation}
+                onChange={(e) => setForm({ ...form, sgaObservation: e.target.value.slice(0, 4000) })}
+                placeholder="Ex.: Realizada coleta de relato por contato telefônico. Histórico de tentativas anexado em PDF."
+              />
+              <small className="field-help">A observação será incluída no PDF e enviada junto ao documento. Enquanto a API não expõe escrita no campo “Descrição Evento do Veículo”, use “Copiar observação” se também precisar colá-la manualmente no Controle Interno.</small>
+            </div>
+
+            <div className="sga-transfer-actions">
+              <button type="button" className="btn compact" onClick={copySgaObservation} disabled={!form.sgaObservation.trim()}>
+                <Copy size={13} /> Copiar observação
+              </button>
+              <button
+                type="button"
+                className="btn primary compact"
+                onClick={sendHistoryToSga}
+                disabled={sendingSga || callAttempts.length === 0 || !selectedSgaEvent || !selectedSgaPhotoType}
+              >
+                <Send size={13} /> {sendingSga ? "Enviando..." : "Enviar PDF ao SGA"}
+              </button>
+            </div>
+
+            {sgaMessage && <div className="success sga-transfer-message">{sgaMessage}</div>}
           </div>
         )}
 

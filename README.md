@@ -135,3 +135,24 @@ Depois de alterar Environment Variables, faça um novo deploy.
 ### Importante ao publicar
 Como as gravações de agendamento agora passam pelo backend, publique também o `firestore.rules` desta versão.
 Na Vercel, configure as variáveis SGA apenas no ambiente Production. A senha e o token nunca devem usar prefixo `NEXT_PUBLIC_`.
+
+
+## V1.39.8 - Envio operacional ao SGA
+- O módulo SGA passou a testar também Situações de Evento e Tipos de Foto/Documento.
+- A consulta de evento por placa agora exibe também o código do veículo, necessário para anexar documentos ao Evento.
+- O modal do agendamento ganhou a área **Enviar coleta ao SGA**.
+- O operador consulta os eventos da placa, confirma explicitamente o protocolo correto e escolhe a classificação do documento.
+- O PDF do histórico de ligações pode ser enviado diretamente ao Evento pelo endpoint `veiculo/foto/cadastrar`.
+- O PDF e o upload incluem a **Observação para o SGA** preenchida pelo operador.
+- A observação também possui botão de cópia, pois a API v2 documentada não expõe um método de escrita para o campo `descricao_evento_area` / “Descrição Evento do Veículo (Controle Interno)”.
+- O envio é validado novamente no backend: evento e veículo precisam continuar vinculados à placa do agendamento.
+- O Portal bloqueia repetição acidental do mesmo PDF quando evento, classificação, última tentativa e observação não mudaram.
+- Envios ao SGA entram nos Logs com a ação `SGA_DOCUMENT_SENT`.
+- O último envio confirmado fica registrado no próprio agendamento.
+- Nenhuma credencial SGA é enviada ao navegador.
+
+### Permissão adicional para o upload
+Além das permissões já liberadas em Evento, Veículo e Atendimento, o SGA exige o código do tipo/classificação do arquivo. A V1.39.8 consulta `listar/tipo-foto/ativo`; se o teste indicar falta de permissão, habilite **Vistoria → listar tipo foto** no token do Portal.
+
+### Firestore
+Esta versão não adiciona novas gravações diretas pelo navegador. As informações do envio ao SGA são persistidas pelo Firebase Admin no backend, portanto não há uma nova regra de Firestore específica para o SGA nesta versão.
