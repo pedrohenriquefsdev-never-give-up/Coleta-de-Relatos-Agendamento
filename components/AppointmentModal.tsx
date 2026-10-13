@@ -1,5 +1,6 @@
 "use client";
 
+import { format } from "date-fns";
 import { addDoc, collection, deleteDoc, doc, serverTimestamp, updateDoc } from "firebase/firestore";
 import { History, PhoneCall, RefreshCw, Trash2 } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
@@ -57,6 +58,8 @@ export default function AppointmentModal({
   defaultTime,
   existingAppointments = [],
   availableUsers = [],
+  availableDates = [],
+  developerOverride = false,
   readOnly = false,
   onClose,
   onSaved,
@@ -66,6 +69,8 @@ export default function AppointmentModal({
   defaultTime?: string;
   existingAppointments?: Appointment[];
   availableUsers?: AppUser[];
+  availableDates?: string[];
+  developerOverride?: boolean;
   readOnly?: boolean;
   onClose: () => void;
   onSaved: () => void;
@@ -80,12 +85,16 @@ export default function AppointmentModal({
   const [ramalLoading, setRamalLoading] = useState(false);
   const [callAttempts, setCallAttempts] = useState<CallAttempt[]>([]);
   const [historyLoading, setHistoryLoading] = useState(false);
+  const sortedAvailableDates = useMemo(() => Array.from(new Set(availableDates)).sort(), [availableDates]);
+  const todayLocal = format(new Date(), "yyyy-MM-dd");
+  const firstAvailableDate = sortedAvailableDates.find((date) => date >= todayLocal) || sortedAvailableDates[0] || "";
+  const initialFormDate = initial?.date || defaultDate || (developerOverride ? todayLocal : firstAvailableDate);
   const [form, setForm] = useState({
     plate: initial?.plate || "",
     fullName: initial?.fullName || "",
     phone: initial?.phone || "",
     email: initial?.email || "",
-    date: initial?.date || defaultDate || new Date().toISOString().slice(0, 10),
+    date: initialFormDate,
     time: initial?.time || defaultTime || "08:00",
     durationMinutes: initial?.durationMinutes || 30,
     assignedTo: initial?.assignedTo || initial?.createdBy || profile?.uid || "",
@@ -262,6 +271,10 @@ export default function AppointmentModal({
     setError("");
     if (!form.plate || !form.fullName || !form.phone || !form.email || !form.date || !form.time || !form.assignedTo) {
       return setError("Preencha os campos obrigatórios, incluindo o responsável pela coleta.");
+    }
+    const dateChanged = !initial || form.date !== initial.date;
+    if (!developerOverride && dateChanged && !sortedAvailableDates.includes(form.date)) {
+      return setError("Esta data não foi liberada para novos agendamentos. Escolha um dos dias disponíveis na agenda.");
     }
     if (scheduleConflicts.length > 0) {
       const first = scheduleConflicts[0];
@@ -482,7 +495,21 @@ export default function AppointmentModal({
         <div className="grid-3">
           <div className="field">
             <label>Data *</label>
-            <input className="input" disabled={readOnly} type="date" value={form.date} onChange={(e) => setForm({ ...form, date: e.target.value })} />
+            {developerOverride ? (
+              <input className="input" disabled={readOnly} type="date" value={form.date} onChange={(e) => setForm({ ...form, date: e.target.value })} />
+            ) : (
+              <select className="select" disabled={readOnly} value={form.date} onChange={(e) => setForm({ ...form, date: e.target.value })}>
+                <option value="">Selecione um dia liberado</option>
+                {initial && initial.date && !sortedAvailableDates.includes(initial.date) && (
+                  <option value={initial.date}>{initial.date.split("-").reverse().join("/")} • data atual (fechada)</option>
+                )}
+                {sortedAvailableDates.map((date) => (
+                  <option key={date} value={date}>{date.split("-").reverse().join("/")}</option>
+                ))}
+              </select>
+            )}
+            {!developerOverride && !readOnly && <small className="field-help">Somente dias liberados por Eventos/Administrativo aparecem para novos agendamentos.</small>}
+            {developerOverride && !readOnly && <small className="field-help">Acesso Desenvolvedor: você pode usar qualquer data, inclusive fora da disponibilidade publicada.</small>}
           </div>
           <div className="field">
             <label>Horário *</label>

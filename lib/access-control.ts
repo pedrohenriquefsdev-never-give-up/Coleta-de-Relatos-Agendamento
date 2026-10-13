@@ -21,3 +21,7 @@ export function isManagementRole(role?: string) {
 export function canOperate(role?: string) {
   return role === "desenvolvedor" || role === "admin" || role === "atendente";
 }
+
+export function canManageAgendaAvailability(user?: { role?: string; canManageAgendaAvailability?: boolean } | null) {
+  return Boolean(user && (user.role === "desenvolvedor" || user.role === "admin" || user.canManageAgendaAvailability === true));
+}

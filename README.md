@@ -1,4 +1,4 @@
-# Portal Coleta de Relatos — V1.39.4
+# Portal Coleta de Relatos — V1.39.5
 
 Portal interno para agenda, gestão de acessos, auditoria e futura integração com VTCall.
 
@@ -97,3 +97,14 @@ Depois de alterar Environment Variables, faça um novo deploy.
 - Favicon/ícone da aba do navegador atualizado.
 - Apple touch icon atualizado para atalhos em dispositivos compatíveis.
 - Nenhuma regra de acesso, agenda, VTCall ou Firebase foi alterada nesta versão.
+
+
+## V1.39.5 — Agenda controlada por disponibilidade
+- Nova área **Disponibilidade da agenda** para liberar ou fechar dias.
+- Desenvolvedor e Administradores gerenciam a disponibilidade automaticamente.
+- Usuários de Eventos/Administrativo podem receber a permissão específica **Pode liberar dias da agenda**.
+- Atendentes só conseguem criar novas coletas em dias previamente liberados.
+- O Desenvolvedor mantém override de data.
+- Fechar um dia com coletas existentes exige confirmação e não apaga os registros existentes.
+- Alterações de agendamentos já existentes continuam permitidas quando a data não muda, mesmo se o dia tiver sido fechado depois.
+- Segurança reforçada nas regras do Firestore para impedir criação/mudança de data para dias não liberados.

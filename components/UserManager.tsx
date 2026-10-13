@@ -9,7 +9,7 @@ import { effectiveRole, isPortalDeveloperUid } from "@/lib/access-control";
 import { useSession } from "./AuthGate";
 import Modal from "./Modal";
 
-const DEPARTMENTS = ["Atendimento", "Cadastro", "Comercial", "Operação", "Rastreamento", "Administrativo", "Marketing"];
+const DEPARTMENTS = ["Atendimento", "Eventos", "Cadastro", "Comercial", "Operação", "Rastreamento", "Administrativo", "Marketing"];
 const DEFAULT_VTCALL = { host: "sip23.vtcall.app", extension: "", password: "", port: 5068, transport: "UDP" };
 
 async function readJsonSafe(res: Response) {
@@ -35,7 +35,7 @@ export default function UserManager() {
   const [diagLoading, setDiagLoading] = useState(false);
   const [diag, setDiag] = useState<any>(null);
   const [otherDepartment, setOtherDepartment] = useState("");
-  const [form, setForm] = useState({ name: "", email: "", cpf: "", role: "atendente" as UserRole, department: "Atendimento" });
+  const [form, setForm] = useState({ name: "", email: "", cpf: "", role: "atendente" as UserRole, department: "Atendimento", canManageAgendaAvailability: false });
   const [vtcall, setVtcall] = useState(DEFAULT_VTCALL);
   const [editCpf, setEditCpf] = useState("");
   const [photoLoading, setPhotoLoading] = useState(false);
@@ -74,7 +74,7 @@ export default function UserManager() {
       const data = await readJsonSafe(res);
       if (!res.ok) throw new Error(data.error || "Erro ao criar usuário");
       await saveVTCallFor(data.uid);
-      setForm({ name: "", email: "", cpf: "", role: "atendente", department: "Atendimento" });
+      setForm({ name: "", email: "", cpf: "", role: "atendente", department: "Atendimento", canManageAgendaAvailability: false });
       setVtcall(DEFAULT_VTCALL);
       setOtherDepartment("");
       setOpen(false);
@@ -125,7 +125,10 @@ export default function UserManager() {
     setLoading(true); setError("");
     try {
       const payload: Record<string, unknown> = { name, email, department };
-      if (!isPortalDeveloperUid(editing.uid)) payload.role = editing.role;
+      if (!isPortalDeveloperUid(editing.uid)) {
+        payload.role = editing.role;
+        payload.canManageAgendaAvailability = editing.canManageAgendaAvailability === true;
+      }
       if (cpf) payload.cpf = cpf;
       const res = await fetch(`/api/admin/users/${editing.uid}`, {
         method: "PATCH",
@@ -215,12 +218,13 @@ export default function UserManager() {
   return <>
     <div className="panel">
       <div className="panel-head"><div><h2>Usuários com acesso</h2><small>Perfis, identificação, ramal e status de acesso ao portal.</small></div><div className="row-actions"><button className="btn" onClick={runDiagnostic}><ServerCog size={16}/> Diagnóstico backend</button><button className="btn primary" onClick={()=>setOpen(true)}><Plus size={16}/> Novo usuário</button></div></div>
-      <div className="table-wrap"><table className="table"><thead><tr><th>Usuário</th><th>E-mail</th><th>Departamento</th><th>Ramal</th><th>Perfil</th><th>Status</th><th></th></tr></thead><tbody>
+      <div className="table-wrap"><table className="table"><thead><tr><th>Usuário</th><th>E-mail</th><th>Departamento</th><th>Ramal</th><th>Agenda</th><th>Perfil</th><th>Status</th><th></th></tr></thead><tbody>
         {users.map((u)=><tr key={u.uid}>
           <td><div className="user-table-cell">{u.photoUrl?<img className="avatar" src={u.photoUrl} alt=""/>:<div className="avatar">{u.name?.[0]}</div>}<strong>{u.name}</strong></div></td>
           <td>{u.email}</td>
           <td><span className="department-chip"><BriefcaseBusiness size={13}/>{u.department||"Não informado"}</span></td>
           <td>{u.vtcallConfigured?<span className="department-chip"><PhoneCall size={13}/>{u.vtcallExtension||"Configurado"}</span>:<span className="pill">Não configurado</span>}</td>
+          <td>{u.role === "desenvolvedor" || u.role === "admin" || u.canManageAgendaAvailability ? <span className="pill active">Gerencia</span> : <span className="pill">Somente agenda</span>}</td>
           <td><span className={`pill ${u.role}`}>{u.role === "desenvolvedor" ? "Desenvolvedor" : u.role}</span></td><td><span className={`pill ${u.active?"active":""}`}>{u.active?"Ativo":"Bloqueado"}</span></td>
           <td>{isPortalDeveloperUid(u.uid) && !currentIsDeveloper ? <span className="protected-access"><LockKeyhole size={14}/> Acesso protegido</span> : <div className="row-actions"><button className="btn icon-only" title="Editar usuário e VTCall" onClick={()=>openEdit(u)}><Pencil size={15}/></button>{isPortalDeveloperUid(u.uid)?<span className="protected-access"><LockKeyhole size={14}/> Protegido</span>:<button className="btn" onClick={()=>toggle(u)}>{u.active?<><UserX size={15}/> Bloquear</>:<><UserCheck size={15}/> Ativar</>}</button>}</div>}</td>
         </tr>)}
@@ -258,6 +262,10 @@ export default function UserManager() {
         <div className="grid-2"><div className="field"><label>Departamento</label><select className="select" value={form.department} onChange={(e)=>setForm({...form,department:e.target.value})}>{DEPARTMENTS.map((d)=><option key={d}>{d}</option>)}<option value="__outro__">Outro</option></select></div><div className="field"><label>Perfil de acesso</label><select className="select" value={form.role} onChange={(e)=>setForm({...form,role:e.target.value as UserRole})}><option value="admin">Administrador</option><option value="atendente">Atendente</option><option value="consulta">Consulta</option></select></div></div>
         {form.department==="__outro__"&&<div className="field"><label>Nome do departamento</label><input className="input" value={otherDepartment} onChange={(e)=>setOtherDepartment(e.target.value)}/></div>}
         <div className="info-note"><BriefcaseBusiness size={16}/><span>Departamento é apenas identificação e não altera permissões.</span></div>
+        <label className="agenda-permission-box">
+          <input type="checkbox" checked={form.canManageAgendaAvailability} onChange={(e)=>setForm({...form,canManageAgendaAvailability:e.target.checked})}/>
+          <span><strong>Pode liberar dias da agenda</strong><small>Use para usuários de Eventos/Administrativo que poderão definir os dias disponíveis para o Atendimento.</small></span>
+        </label>
         <VtFields/>
       </div>
     </Modal>}
@@ -277,6 +285,10 @@ export default function UserManager() {
           <div className="field"><label>Perfil de acesso</label><select className="select" value={editing.role} disabled={isPortalDeveloperUid(editing.uid) || (editing.uid===auth.currentUser?.uid && !currentIsDeveloper)} onChange={(e)=>setEditing({...editing,role:e.target.value as UserRole})}>{isPortalDeveloperUid(editing.uid)&&<option value="desenvolvedor">Desenvolvedor</option>}<option value="admin">Administrador</option><option value="atendente">Atendente</option><option value="consulta">Consulta</option></select></div>
         </div>
         {editing.department==="__outro__"&&<div className="field"><label>Nome do departamento</label><input className="input" value={otherDepartment} onChange={(e)=>setOtherDepartment(e.target.value)}/></div>}
+        <label className={`agenda-permission-box ${isPortalDeveloperUid(editing.uid) || editing.role === "admin" ? "locked" : ""}`}>
+          <input type="checkbox" checked={isPortalDeveloperUid(editing.uid) || editing.role === "admin" || editing.canManageAgendaAvailability === true} disabled={isPortalDeveloperUid(editing.uid) || editing.role === "admin"} onChange={(e)=>setEditing({...editing,canManageAgendaAvailability:e.target.checked})}/>
+          <span><strong>Pode liberar dias da agenda</strong><small>{editing.role === "admin" || isPortalDeveloperUid(editing.uid) ? "Administradores e o Desenvolvedor já possuem essa permissão automaticamente." : "Permite acessar Disponibilidade e liberar/fechar dias para novos agendamentos."}</small></span>
+        </label>
         {isPortalDeveloperUid(editing.uid)?<div className="developer-note"><LockKeyhole size={16}/><span>Perfil Desenvolvedor exclusivo. O nível de acesso não pode ser alterado, bloqueado ou atribuído a outra conta.</span></div>:editing.uid===auth.currentUser?.uid&&<div className="info-note"><KeyRound size={16}/><span>Por segurança, você não pode remover seu próprio perfil de administrador por esta tela.</span></div>}
         <VtFields/>
       </div>

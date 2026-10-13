@@ -21,6 +21,7 @@ export interface AppUser {
   vtcallConfigured?: boolean;
   vtcallExtension?: string;
   cpfLast4?: string;
+  canManageAgendaAvailability?: boolean;
   createdAt?: unknown;
   lastAccessAt?: unknown;
 }
@@ -70,4 +71,16 @@ export interface Appointment {
       count?: number;
     };
   };
+}
+
+export interface AgendaAvailability {
+  date: string;
+  enabled: boolean;
+  openedBy?: string;
+  openedByName?: string;
+  openedAt?: unknown;
+  closedBy?: string;
+  closedByName?: string;
+  closedAt?: unknown;
+  updatedAt?: unknown;
 }

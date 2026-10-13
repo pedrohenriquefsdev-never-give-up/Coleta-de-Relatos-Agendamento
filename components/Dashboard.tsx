@@ -6,6 +6,7 @@ import { collection, limit, onSnapshot, orderBy, query } from "firebase/firestor
 import {
   CalendarCheck2,
   CalendarDays,
+  CalendarRange,
   CarFront,
   CheckCircle2,
   ClipboardList,
@@ -24,9 +25,10 @@ import {
 } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 import { db } from "@/lib/firebase";
-import type { AppUser, Appointment } from "@/lib/types";
-import { effectiveRole, isManagementRole } from "@/lib/access-control";
+import type { AgendaAvailability, AppUser, Appointment } from "@/lib/types";
+import { canManageAgendaAvailability, effectiveRole, isManagementRole } from "@/lib/access-control";
 import { useSession } from "./AuthGate";
+import AgendaAvailabilityManager from "./AgendaAvailabilityManager";
 import AppointmentModal from "./AppointmentModal";
 import Plate from "./Plate";
 import ProfilePanel from "./ProfilePanel";
@@ -65,6 +67,8 @@ const actions: Record<string, string> = {
   USER_PHOTO_UPDATED_BY_DEVELOPER: "Desenvolvedor alterou foto de usuário",
   VTCALL_CREDENTIALS_UPDATED: "Atualizou configuração VTCall",
   VTCALL_CALL_REQUESTED: "Solicitou ligação VTCall",
+  AGENDA_DAY_OPENED: "Liberou dia na agenda",
+  AGENDA_DAY_CLOSED: "Fechou dia na agenda",
 };
 
 const tabLabels: Record<string, string> = {
@@ -74,6 +78,7 @@ const tabLabels: Record<string, string> = {
   logs: "Logs e auditoria",
   perfil: "Meu perfil",
   vtcall: "VTCall",
+  disponibilidade: "Disponibilidade da agenda",
 };
 
 const appointmentStatusLabels: Record<string, string> = {
@@ -94,6 +99,7 @@ export default function Dashboard() {
   const [appointments, setAppointments] = useState<Appointment[]>([]);
   const [users, setUsers] = useState<AppUser[]>([]);
   const [logs, setLogs] = useState<any[]>([]);
+  const [availability, setAvailability] = useState<Record<string, AgendaAvailability>>({});
   const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState("todos");
   const [responsibleFilter, setResponsibleFilter] = useState("todos");
@@ -110,6 +116,17 @@ export default function Dashboard() {
   useEffect(() => {
     return onSnapshot(query(collection(db, "users"), orderBy("name")), (snapshot) => {
       setUsers(snapshot.docs.map((docSnap) => { const raw = { uid: docSnap.id, ...docSnap.data() } as AppUser; return { ...raw, role: effectiveRole(raw.uid, raw.role) }; }));
+    });
+  }, []);
+
+  useEffect(() => {
+    return onSnapshot(collection(db, "agendaAvailability"), (snapshot) => {
+      const next: Record<string, AgendaAvailability> = {};
+      snapshot.docs.forEach((docSnap) => {
+        const data = docSnap.data() as Partial<AgendaAvailability>;
+        next[docSnap.id] = { date: data.date || docSnap.id, enabled: data.enabled === true, ...data } as AgendaAvailability;
+      });
+      setAvailability(next);
     });
   }, []);
 
@@ -145,6 +162,8 @@ export default function Dashboard() {
   const currentProfile = profile;
   const canDeleteAppointments = currentProfile.role === "desenvolvedor" || currentProfile.role === "admin";
   const canEditAppointments = currentProfile.role === "desenvolvedor" || currentProfile.role === "admin" || currentProfile.role === "atendente";
+  const canManageAvailability = canManageAgendaAvailability(currentProfile);
+  const availableDates = Object.values(availability).filter((item) => item.enabled && item.date >= today).map((item) => item.date).sort();
 
   function openEdit(appointment: Appointment) {
     setModal({ item: appointment });
@@ -248,6 +267,14 @@ export default function Dashboard() {
         <UserManager />
       ) : (
         <div className="panel"><div className="empty">Somente o Desenvolvedor e administradores podem gerenciar usuários.</div></div>
+      );
+    }
+
+    if (tab === "disponibilidade") {
+      return canManageAvailability ? (
+        <AgendaAvailabilityManager availability={availability} appointments={appointments} />
+      ) : (
+        <div className="panel"><div className="empty">Seu usuário não possui permissão para liberar dias da agenda.</div></div>
       );
     }
 
@@ -369,6 +396,7 @@ export default function Dashboard() {
                     <div key={d.toISOString()}>
                       {format(d, "EEE", { locale: ptBR })}
                       <strong>{format(d, "dd/MM")}</strong>
+                      <span className={`day-availability ${availability[date]?.enabled ? "open" : "closed"}`}>{availability[date]?.enabled ? "Disponível" : "Fechado"}</span>
                       <span className="day-appointment-count">{dayCount === 1 ? "1 coleta" : `${dayCount} coletas`}</span>
                     </div>
                   );
@@ -384,7 +412,12 @@ export default function Dashboard() {
                       .filter((a) => a.date === date && a.time === h)
                       .sort((a, b) => (a.assignedToName || a.createdByName || "").localeCompare(b.assignedToName || b.createdByName || ""));
                     return (
-                      <div className="cal-cell" key={date + h} onDoubleClick={() => canEditAppointments && setModal({ date, time: h })}>
+                      <div
+                        className={`cal-cell ${availability[date]?.enabled ? "calendar-day-open" : "calendar-day-closed"}`}
+                        key={date + h}
+                        title={availability[date]?.enabled || currentProfile.role === "desenvolvedor" ? "Duplo clique para agendar" : "Dia não liberado para novos agendamentos"}
+                        onDoubleClick={() => canEditAppointments && (availability[date]?.enabled || currentProfile.role === "desenvolvedor") && setModal({ date, time: h })}
+                      >
                         {items.map((a) => (
                           <div key={a.id} className={`appointment-card ${a.status}`} onClick={() => openEdit(a)}>
                             <div className="appointment-time">{a.time}</div>
@@ -419,6 +452,7 @@ export default function Dashboard() {
         <div className="nav">
           <button className={tab === "agenda" ? "active" : ""} onClick={() => setTab("agenda")}><CalendarDays size={18} /> Agenda</button>
           <button className={tab === "agendamentos" ? "active" : ""} onClick={() => setTab("agendamentos")}><ClipboardList size={18} /> Agendamentos</button>
+          {canManageAvailability && <button className={tab === "disponibilidade" ? "active" : ""} onClick={() => setTab("disponibilidade")}><CalendarRange size={18} /> Disponibilidade</button>}
           {isManagementRole(currentProfile.role) && <button className={tab === "usuarios" ? "active" : ""} onClick={() => setTab("usuarios")}><Users size={18} /> Usuários</button>}
           {isManagementRole(currentProfile.role) && <button className={tab === "logs" ? "active" : ""} onClick={() => setTab("logs")}><History size={18} /> Logs</button>}
           <button className={tab === "perfil" ? "active" : ""} onClick={() => setTab("perfil")}><UserRound size={18} /> Meu perfil</button>
@@ -470,7 +504,7 @@ export default function Dashboard() {
         {renderBody()}
       </main>
 
-      {modal && <AppointmentModal initial={modal.item} defaultDate={modal.date} defaultTime={modal.time} existingAppointments={appointments} availableUsers={users} readOnly={!canEditAppointments} onClose={() => setModal(null)} onSaved={() => {}} />}
+      {modal && <AppointmentModal initial={modal.item} defaultDate={modal.date} defaultTime={modal.time} existingAppointments={appointments} availableUsers={users} availableDates={availableDates} developerOverride={currentProfile.role === "desenvolvedor"} readOnly={!canEditAppointments} onClose={() => setModal(null)} onSaved={() => {}} />}
     </div>
   );
 }

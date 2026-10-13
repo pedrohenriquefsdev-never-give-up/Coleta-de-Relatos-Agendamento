@@ -8,6 +8,8 @@ service cloud.firestore {
     function admin() { return active() && userDoc().data.role == 'admin'; }
     function management() { return developer() || admin(); }
     function canEdit() { return developer() || (active() && (userDoc().data.role == 'admin' || userDoc().data.role == 'atendente')); }
+    function availabilityManager() { return developer() || admin() || (active() && userDoc().data.canManageAgendaAvailability == true); }
+    function dateIsOpen(date) { return exists(/databases/$(database)/documents/agendaAvailability/$(date)) && get(/databases/$(database)/documents/agendaAvailability/$(date)).data.enabled == true; }
     function protectedDeveloper(uid) { return uid == 'PBH5b5zU3EQuQYigKWGe8MTlQis2'; }
 
     match /users/{uid} {
@@ -21,8 +23,14 @@ service cloud.firestore {
 
     match /appointments/{id} {
       allow read: if active();
-      allow create, update: if canEdit();
+      allow create: if canEdit() && (developer() || dateIsOpen(request.resource.data.date));
+      allow update: if canEdit() && (developer() || request.resource.data.date == resource.data.date || dateIsOpen(request.resource.data.date));
       allow delete: if management();
+    }
+
+    match /agendaAvailability/{date} {
+      allow read: if active();
+      allow create, update, delete: if availabilityManager();
     }
 
     match /auditLogs/{id} {

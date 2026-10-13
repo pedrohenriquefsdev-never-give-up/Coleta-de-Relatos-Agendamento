@@ -80,6 +80,12 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ ui
       details.department = department;
     }
 
+    if (typeof body.canManageAgendaAvailability === "boolean") {
+      if (targetIsDeveloper) return Response.json({ error: "O Desenvolvedor já possui acesso total à disponibilidade da agenda." }, { status: 400 });
+      updates.canManageAgendaAvailability = body.canManageAgendaAvailability;
+      details.canManageAgendaAvailability = body.canManageAgendaAvailability;
+    }
+
     if (typeof body.cpf === "string" && body.cpf.trim()) {
       const cpf = body.cpf.replace(/\D/g, "");
       if (cpf.length !== 11) return Response.json({ error: "O novo CPF precisa ter 11 dígitos." }, { status: 400 });
