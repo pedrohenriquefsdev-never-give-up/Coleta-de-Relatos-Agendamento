@@ -73,9 +73,17 @@ export interface Appointment {
   };
 }
 
+export interface AgendaAvailabilitySlot {
+  assignedTo: string;
+  assignedToName?: string;
+  start: string;
+  end: string;
+}
+
 export interface AgendaAvailability {
   date: string;
   enabled: boolean;
+  slots?: AgendaAvailabilitySlot[];
   openedBy?: string;
   openedByName?: string;
   openedAt?: unknown;

@@ -1,6 +1,6 @@
-# Portal Coleta de Relatos — V1.39.6
+# Portal Coleta de Relatos — V1.39.7
 
-Portal interno para agenda, gestão de acessos, auditoria e futura integração com VTCall.
+Portal interno para agenda, gestão de acessos, auditoria, VTCall e integração gradual com o SGA.
 
 ## Stack
 - Next.js 16 + React 19
@@ -118,3 +118,20 @@ Depois de alterar Environment Variables, faça um novo deploy.
 - A permissão `Pode liberar dias da agenda` é validada no servidor; Desenvolvedor e Administrador continuam autorizados automaticamente.
 - Disponibilidade da agenda é carregada pelo backend e atualizada periodicamente para todos os usuários.
 - Histórico de tentativas de ligação ganhou botão `Exportar`, gerando CSV compatível com Excel com todas as tentativas carregadas do agendamento.
+
+
+## V1.39.7 - Disponibilidade por horário, PDF e preparação SGA
+- A disponibilidade deixa de ser apenas por dia: agora pode ser definida por responsável e faixa de horário.
+- O Atendimento só consegue criar/mover coletas para horários liberados para o responsável escolhido.
+- A criação/edição/exclusão de agendamentos passou para API protegida no backend; isso permite validar a disponibilidade também no servidor.
+- A tela de disponibilidade alerta quando uma alteração deixará coletas já existentes fora dos períodos publicados.
+- Histórico de ligações ganhou exportação em PDF, além do CSV.
+- Novo módulo SGA para Desenvolvedor/Administrador, inicialmente somente leitura/teste.
+- O módulo SGA testa autenticação, lista Departamentos/Status/Tipos com seus códigos e consulta evento por placa.
+- Variáveis novas de servidor: SGA_BASE_URL, SGA_INTEGRATION_TOKEN, SGA_API_USER e SGA_API_PASSWORD.
+- Nenhuma credencial SGA é gravada no frontend ou no repositório.
+- Nesta versão o Portal ainda NÃO cria histórico nem envia PDF ao SGA. Essa etapa será ativada somente depois de validar a chave e os códigos corretos do SGA.
+
+### Importante ao publicar
+Como as gravações de agendamento agora passam pelo backend, publique também o `firestore.rules` desta versão.
+Na Vercel, configure as variáveis SGA apenas no ambiente Production. A senha e o token nunca devem usar prefixo `NEXT_PUBLIC_`.

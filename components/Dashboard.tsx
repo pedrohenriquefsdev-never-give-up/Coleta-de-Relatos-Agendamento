@@ -12,6 +12,7 @@ import {
   ClipboardList,
   Clock3,
   FileText,
+  Database,
   Eye,
   History,
   LogOut,
@@ -26,6 +27,7 @@ import {
 } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 import { db } from "@/lib/firebase";
+import { dateHasTime } from "@/lib/agenda-availability";
 import type { AgendaAvailability, AppUser, Appointment } from "@/lib/types";
 import { canManageAgendaAvailability, effectiveRole, isManagementRole } from "@/lib/access-control";
 import { useSession } from "./AuthGate";
@@ -36,6 +38,7 @@ import ProfilePanel from "./ProfilePanel";
 import ThemeToggle from "./ThemeToggle";
 import UserManager from "./UserManager";
 import VTCallPage from "./VTCallPage";
+import SGAPage from "./SGAPage";
 
 const hours = [
   "08:00",
@@ -70,6 +73,7 @@ const actions: Record<string, string> = {
   VTCALL_CREDENTIALS_UPDATED: "Atualizou configuração VTCall",
   VTCALL_CALL_REQUESTED: "Solicitou ligação VTCall",
   AGENDA_DAY_OPENED: "Liberou dia na agenda",
+  AGENDA_AVAILABILITY_UPDATED: "Atualizou horários da agenda",
   AGENDA_DAY_CLOSED: "Fechou dia na agenda",
 };
 
@@ -81,6 +85,7 @@ const tabLabels: Record<string, string> = {
   perfil: "Meu perfil",
   vtcall: "VTCall",
   disponibilidade: "Disponibilidade da agenda",
+  sga: "Integração SGA",
 };
 
 const appointmentStatusLabels: Record<string, string> = {
@@ -322,6 +327,7 @@ export default function Dashboard() {
           <AgendaAvailabilityManager
             availability={availability}
             appointments={appointments}
+            users={users}
             onChanged={(item) => {
               setAvailability((current) => ({ ...current, [item.date]: item }));
               setAvailabilityError("");
@@ -331,6 +337,10 @@ export default function Dashboard() {
       ) : (
         <div className="panel"><div className="empty">Seu usuário não possui permissão para liberar dias da agenda.</div></div>
       );
+    }
+
+    if (tab === "sga") {
+      return isManagementRole(currentProfile.role) ? <SGAPage /> : <div className="panel"><div className="empty">Somente o Desenvolvedor e administradores podem validar a integração SGA.</div></div>;
     }
 
     if (tab === "perfil") return <ProfilePanel />;
@@ -461,7 +471,7 @@ export default function Dashboard() {
                     <div key={d.toISOString()}>
                       {format(d, "EEE", { locale: ptBR })}
                       <strong>{format(d, "dd/MM")}</strong>
-                      <span className={`day-availability ${availability[date]?.enabled ? "open" : "closed"}`}>{availability[date]?.enabled ? "Disponível" : "Fechado"}</span>
+                      <span className={`day-availability ${availability[date]?.enabled ? "open" : "closed"}`}>{availability[date]?.enabled ? (availability[date]?.slots?.length ? `${availability[date].slots!.length} período${availability[date].slots!.length === 1 ? "" : "s"}` : "Disponível") : "Fechado"}</span>
                       <span className="day-appointment-count">{dayCount === 1 ? "1 coleta" : `${dayCount} coletas`}</span>
                     </div>
                   );
@@ -478,10 +488,10 @@ export default function Dashboard() {
                       .sort((a, b) => (a.assignedToName || a.createdByName || "").localeCompare(b.assignedToName || b.createdByName || ""));
                     return (
                       <div
-                        className={`cal-cell ${availability[date]?.enabled ? "calendar-day-open" : "calendar-day-closed"}`}
+                        className={`cal-cell ${dateHasTime(availability[date], h, 30) ? "calendar-day-open" : "calendar-day-closed"}`}
                         key={date + h}
-                        title={availability[date]?.enabled || currentProfile.role === "desenvolvedor" ? "Duplo clique para agendar" : "Dia não liberado para novos agendamentos"}
-                        onDoubleClick={() => canEditAppointments && (availability[date]?.enabled || currentProfile.role === "desenvolvedor") && setModal({ date, time: h })}
+                        title={currentProfile.role === "desenvolvedor" || dateHasTime(availability[date], h, 30) ? "Duplo clique para agendar" : "Horário não liberado para novos agendamentos"}
+                        onDoubleClick={() => canEditAppointments && (currentProfile.role === "desenvolvedor" || dateHasTime(availability[date], h, 30)) && setModal({ date, time: h })}
                       >
                         {items.map((a) => (
                           <div key={a.id} className={`appointment-card ${a.status}`} onClick={() => openEdit(a)}>
@@ -520,6 +530,7 @@ export default function Dashboard() {
           {canManageAvailability && <button className={tab === "disponibilidade" ? "active" : ""} onClick={() => setTab("disponibilidade")}><CalendarRange size={18} /> Disponibilidade</button>}
           {isManagementRole(currentProfile.role) && <button className={tab === "usuarios" ? "active" : ""} onClick={() => setTab("usuarios")}><Users size={18} /> Usuários</button>}
           {isManagementRole(currentProfile.role) && <button className={tab === "logs" ? "active" : ""} onClick={() => setTab("logs")}><History size={18} /> Logs</button>}
+          {isManagementRole(currentProfile.role) && <button className={tab === "sga" ? "active" : ""} onClick={() => setTab("sga")}><Database size={18} /> SGA</button>}
           <button className={tab === "perfil" ? "active" : ""} onClick={() => setTab("perfil")}><UserRound size={18} /> Meu perfil</button>
           <button className={tab === "vtcall" ? "active" : ""} onClick={() => setTab("vtcall")}><PhoneCall size={18} /> VTCall</button>
         </div>
@@ -569,7 +580,7 @@ export default function Dashboard() {
         {renderBody()}
       </main>
 
-      {modal && <AppointmentModal initial={modal.item} defaultDate={modal.date} defaultTime={modal.time} existingAppointments={appointments} availableUsers={users} availableDates={availableDates} developerOverride={currentProfile.role === "desenvolvedor"} readOnly={!canEditAppointments} onClose={() => setModal(null)} onSaved={() => {}} />}
+      {modal && <AppointmentModal initial={modal.item} defaultDate={modal.date} defaultTime={modal.time} existingAppointments={appointments} availableUsers={users} availableDates={availableDates} availability={availability} developerOverride={currentProfile.role === "desenvolvedor"} readOnly={!canEditAppointments} onClose={() => setModal(null)} onSaved={() => {}} />}
     </div>
   );
 }

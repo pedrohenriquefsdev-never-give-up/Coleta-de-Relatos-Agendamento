@@ -1,13 +1,12 @@
 "use client";
 
 import { format } from "date-fns";
-import { addDoc, collection, deleteDoc, doc, serverTimestamp, updateDoc } from "firebase/firestore";
 import { Download, History, PhoneCall, RefreshCw, Trash2 } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
-import { db } from "@/lib/firebase";
 import { useSession } from "./AuthGate";
 import Modal from "./Modal";
-import type { AppUser, Appointment, AppointmentStatus } from "@/lib/types";
+import { availableTimesForUser, fitsAvailability } from "@/lib/agenda-availability";
+import type { AgendaAvailability, AppUser, Appointment, AppointmentStatus } from "@/lib/types";
 
 const cleanPlate = (v: string) => v.toUpperCase().replace(/[^A-Z0-9]/g, "").slice(0, 7);
 const cleanPhone = (v: string) => v.replace(/\D/g, "").slice(0, 11);
@@ -51,6 +50,7 @@ export default function AppointmentModal({
   existingAppointments = [],
   availableUsers = [],
   availableDates = [],
+  availability = {},
   developerOverride = false,
   readOnly = false,
   onClose,
@@ -62,6 +62,7 @@ export default function AppointmentModal({
   existingAppointments?: Appointment[];
   availableUsers?: AppUser[];
   availableDates?: string[];
+  availability?: Record<string, AgendaAvailability>;
   developerOverride?: boolean;
   readOnly?: boolean;
   onClose: () => void;
@@ -101,6 +102,13 @@ export default function AppointmentModal({
   const operationalUsers = useMemo(
     () => availableUsers.filter((item) => item.active && (item.role === "desenvolvedor" || item.role === "admin" || item.role === "atendente")),
     [availableUsers],
+  );
+
+  const selectedAvailability = availability[form.date];
+  const hasStructuredAvailability = Boolean(selectedAvailability?.enabled && Array.isArray(selectedAvailability?.slots) && selectedAvailability.slots.length > 0);
+  const allowedTimes = useMemo(
+    () => hasStructuredAvailability ? availableTimesForUser(selectedAvailability, form.assignedTo, Number(form.durationMinutes || 30)) : [],
+    [form.assignedTo, form.durationMinutes, hasStructuredAvailability, selectedAvailability],
   );
 
   const duplicateMatches = useMemo(() => {
@@ -150,19 +158,6 @@ export default function AppointmentModal({
     return user?.getIdToken();
   }
 
-  async function writeAudit(action: string, targetId: string, details: Record<string, unknown>) {
-    try {
-      const token = await getToken();
-      if (!token) return;
-      await fetch("/api/audit", {
-        method: "POST",
-        headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
-        body: JSON.stringify({ action, targetId, details }),
-      });
-    } catch {
-      // Auditoria não deve impedir o fluxo principal.
-    }
-  }
 
   function exportCallHistory() {
     if (!initial || callAttempts.length === 0) return;
@@ -188,6 +183,33 @@ export default function AppointmentModal({
     anchor.click();
     anchor.remove();
     URL.revokeObjectURL(url);
+  }
+
+  async function exportCallHistoryPdf() {
+    if (!initial || !user) return;
+    setError("");
+    try {
+      const token = await getToken();
+      const response = await fetch(`/api/reports/call-history/pdf?appointmentId=${encodeURIComponent(initial.id)}`, {
+        headers: { Authorization: `Bearer ${token}` },
+        cache: "no-store",
+      });
+      if (!response.ok) {
+        const data = await response.json().catch(() => ({}));
+        throw new Error(data.error || "Não foi possível gerar o PDF.");
+      }
+      const blob = await response.blob();
+      const url = URL.createObjectURL(blob);
+      const anchor = document.createElement("a");
+      anchor.href = url;
+      anchor.download = `coleta-relato-${cleanPlate(initial.plate) || initial.id}-${initial.date}.pdf`;
+      document.body.appendChild(anchor);
+      anchor.click();
+      anchor.remove();
+      URL.revokeObjectURL(url);
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Não foi possível gerar o PDF.");
+    }
   }
 
   async function refreshRamalStatus(silent = false): Promise<RamalStatus | null> {
@@ -304,9 +326,14 @@ export default function AppointmentModal({
     if (!form.plate || !form.fullName || !form.phone || !form.email || !form.date || !form.time || !form.assignedTo) {
       return setError("Preencha os campos obrigatórios, incluindo o responsável pela coleta.");
     }
-    const dateChanged = !initial || form.date !== initial.date;
-    if (!developerOverride && dateChanged && !sortedAvailableDates.includes(form.date)) {
-      return setError("Esta data não foi liberada para novos agendamentos. Escolha um dos dias disponíveis na agenda.");
+    const scheduleChanged = !initial || form.date !== initial.date || form.time !== initial.time || form.assignedTo !== (initial.assignedTo || initial.createdBy) || Number(form.durationMinutes || 30) !== Number(initial.durationMinutes || 30);
+    if (!developerOverride && scheduleChanged) {
+      if (!sortedAvailableDates.includes(form.date)) {
+        return setError("Esta data não foi liberada para novos agendamentos. Escolha um dos dias disponíveis na agenda.");
+      }
+      if (hasStructuredAvailability && !fitsAvailability(selectedAvailability, form.assignedTo, form.time, Number(form.durationMinutes || 30))) {
+        return setError("Este responsável não está disponível nesse horário. Escolha um dos horários liberados.");
+      }
     }
     if (scheduleConflicts.length > 0) {
       const first = scheduleConflicts[0];
@@ -323,38 +350,16 @@ export default function AppointmentModal({
         plate: cleanPlate(form.plate),
         phone: cleanedPhone,
         phoneDigits: cleanedPhone,
-        updatedAt: serverTimestamp(),
       };
-
-      if (initial) {
-        await updateDoc(doc(db, "appointments", initial.id), payload);
-        await writeAudit("APPOINTMENT_UPDATED", initial.id, {
-          plate: payload.plate,
-          fullName: payload.fullName,
-          phone: payload.phone,
-          status: payload.status,
-          assignedToName: payload.assignedToName,
-          date: payload.date,
-          time: payload.time,
-        });
-      } else {
-        const created = await addDoc(collection(db, "appointments"), {
-          ...payload,
-          createdAt: serverTimestamp(),
-          createdBy: user!.uid,
-          createdByName: profile!.name,
-        });
-        await writeAudit("APPOINTMENT_CREATED", created.id, {
-          plate: payload.plate,
-          fullName: payload.fullName,
-          phone: payload.phone,
-          status: payload.status,
-          assignedToName: payload.assignedToName,
-          date: payload.date,
-          time: payload.time,
-        });
-      }
-
+      const token = await getToken();
+      if (!token) throw new Error("Sessão expirada. Entre novamente no portal.");
+      const response = await fetch("/api/appointments", {
+        method: initial ? "PATCH" : "POST",
+        headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+        body: JSON.stringify(initial ? { id: initial.id, ...payload } : payload),
+      });
+      const data = await response.json().catch(() => ({}));
+      if (!response.ok) throw new Error(data.error || "Não foi possível salvar o agendamento.");
       onSaved();
       onClose();
     } catch (e) {
@@ -372,14 +377,15 @@ export default function AppointmentModal({
     setDeleting(true);
     setError("");
     try {
-      await deleteDoc(doc(db, "appointments", initial.id));
-      await writeAudit("APPOINTMENT_DELETED", initial.id, {
-        plate: initial.plate,
-        fullName: initial.fullName,
-        phone: initial.phone,
-        date: initial.date,
-        time: initial.time,
+      const token = await getToken();
+      if (!token) throw new Error("Sessão expirada. Entre novamente no portal.");
+      const response = await fetch("/api/appointments", {
+        method: "DELETE",
+        headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+        body: JSON.stringify({ id: initial.id }),
       });
+      const data = await response.json().catch(() => ({}));
+      if (!response.ok) throw new Error(data.error || "Não foi possível excluir o agendamento.");
       onSaved();
       onClose();
     } catch (e) {
@@ -508,8 +514,12 @@ export default function AppointmentModal({
             disabled={readOnly}
             value={form.assignedTo}
             onChange={(e) => {
-              const selected = operationalUsers.find((item) => item.uid === e.target.value);
-              setForm({ ...form, assignedTo: e.target.value, assignedToName: selected?.name || "" });
+              const assignedTo = e.target.value;
+              const selected = operationalUsers.find((item) => item.uid === assignedTo);
+              const nextTimes = Array.isArray(availability[form.date]?.slots) && availability[form.date]!.slots!.length > 0
+                ? availableTimesForUser(availability[form.date], assignedTo, Number(form.durationMinutes || 30))
+                : [];
+              setForm({ ...form, assignedTo, assignedToName: selected?.name || "", time: nextTimes.length > 0 && !nextTimes.includes(form.time) ? nextTimes[0] : form.time });
             }}
           >
             <option value="">Selecione o responsável</option>
@@ -531,7 +541,13 @@ export default function AppointmentModal({
             {developerOverride ? (
               <input className="input" disabled={readOnly} type="date" value={form.date} onChange={(e) => setForm({ ...form, date: e.target.value })} />
             ) : (
-              <select className="select" disabled={readOnly} value={form.date} onChange={(e) => setForm({ ...form, date: e.target.value })}>
+              <select className="select" disabled={readOnly} value={form.date} onChange={(e) => {
+                const date = e.target.value;
+                const nextTimes = Array.isArray(availability[date]?.slots) && availability[date]!.slots!.length > 0
+                  ? availableTimesForUser(availability[date], form.assignedTo, Number(form.durationMinutes || 30))
+                  : [];
+                setForm({ ...form, date, time: nextTimes.length > 0 && !nextTimes.includes(form.time) ? nextTimes[0] : form.time });
+              }}>
                 <option value="">Selecione um dia liberado</option>
                 {initial && initial.date && !sortedAvailableDates.includes(initial.date) && (
                   <option value={initial.date}>{initial.date.split("-").reverse().join("/")} • data atual (fechada)</option>
@@ -546,11 +562,24 @@ export default function AppointmentModal({
           </div>
           <div className="field">
             <label>Horário *</label>
-            <input className="input" disabled={readOnly} type="time" value={form.time} onChange={(e) => setForm({ ...form, time: e.target.value })} />
+            {developerOverride || !hasStructuredAvailability ? (
+              <input className="input" disabled={readOnly} type="time" value={form.time} onChange={(e) => setForm({ ...form, time: e.target.value })} />
+            ) : (
+              <select className="select" disabled={readOnly || !form.assignedTo} value={form.time} onChange={(e) => setForm({ ...form, time: e.target.value })}>
+                <option value="">Selecione um horário liberado</option>
+                {allowedTimes.map((time) => <option key={time} value={time}>{time}</option>)}
+                {initial && form.time && !allowedTimes.includes(form.time) && <option value={form.time}>{form.time} • horário atual</option>}
+              </select>
+            )}
+            {!developerOverride && hasStructuredAvailability && form.assignedTo && allowedTimes.length === 0 && !readOnly && <small className="field-help warning-text">Este responsável não possui horário compatível com a duração selecionada neste dia.</small>}
           </div>
           <div className="field">
             <label>Duração</label>
-            <select className="select" disabled={readOnly} value={form.durationMinutes} onChange={(e) => setForm({ ...form, durationMinutes: Number(e.target.value) })}>
+            <select className="select" disabled={readOnly} value={form.durationMinutes} onChange={(e) => {
+              const durationMinutes = Number(e.target.value);
+              const nextTimes = hasStructuredAvailability ? availableTimesForUser(selectedAvailability, form.assignedTo, durationMinutes) : [];
+              setForm({ ...form, durationMinutes, time: nextTimes.length > 0 && !nextTimes.includes(form.time) ? nextTimes[0] : form.time });
+            }}>
               <option value={20}>20 min</option>
               <option value={30}>30 min</option>
               <option value={45}>45 min</option>
@@ -589,7 +618,10 @@ export default function AppointmentModal({
               </div>
               <div className="call-history-actions">
                 <button type="button" className="btn compact" onClick={exportCallHistory} disabled={callAttempts.length === 0} title="Exportar histórico de tentativas em CSV">
-                  <Download size={13} /> Exportar
+                  <Download size={13} /> CSV
+                </button>
+                <button type="button" className="btn compact" onClick={exportCallHistoryPdf} disabled={callAttempts.length === 0} title="Gerar PDF da coleta para anexar ao SGA">
+                  <Download size={13} /> PDF
                 </button>
                 <button type="button" className="icon-btn mini" onClick={() => loadCallHistory()} disabled={historyLoading} title="Atualizar histórico">
                   <RefreshCw size={14} className={historyLoading ? "spin-icon" : ""} />

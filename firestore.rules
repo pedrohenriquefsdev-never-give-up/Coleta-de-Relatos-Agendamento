@@ -23,9 +23,8 @@ service cloud.firestore {
 
     match /appointments/{id} {
       allow read: if active();
-      allow create: if canEdit() && (developer() || dateIsOpen(request.resource.data.date));
-      allow update: if canEdit() && (developer() || request.resource.data.date == resource.data.date || dateIsOpen(request.resource.data.date));
-      allow delete: if management();
+      // Escrita passa pela API protegida do portal para validar responsável, dia e faixa de horário.
+      allow create, update, delete: if false;
     }
 
     match /agendaAvailability/{date} {

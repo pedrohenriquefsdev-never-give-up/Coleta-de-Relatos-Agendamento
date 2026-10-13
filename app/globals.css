@@ -2000,3 +2000,47 @@
 .call-history-actions{display:flex;align-items:center;gap:6px;min-width:auto!important}
 .btn.compact{padding:6px 9px;border-radius:9px;font-size:9px;min-height:30px}
 .logs-message{margin:12px 16px 0}
+
+/* V1.39.7 - disponibilidade por horário/responsável */
+.availability-day.selected{outline:2px solid var(--yellow);outline-offset:-2px;position:relative;z-index:1}
+.availability-editor{overflow:visible}
+.availability-slot-list{display:flex;flex-direction:column;gap:10px}
+.availability-slot-row{display:grid;grid-template-columns:minmax(220px,1.6fr) minmax(120px,.7fr) minmax(120px,.7fr) 42px;gap:10px;align-items:end;padding:12px;border:1px solid var(--line);border-radius:14px;background:var(--surface-2)}
+.availability-slot-row .field{margin:0}
+.slot-remove{margin-bottom:1px}
+
+/* V1.39.7 - painel de diagnóstico SGA */
+.sga-status-grid{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:10px;margin-top:12px}
+.sga-status-grid>div{min-height:82px;border:1px solid var(--line);border-radius:14px;background:var(--surface-2);padding:12px;display:flex;flex-direction:column;justify-content:center;gap:4px}
+.sga-status-grid>div:first-child{flex-direction:row;align-items:center;justify-content:flex-start;gap:10px}
+.sga-status-grid svg{color:var(--yellow)}
+.sga-status-grid strong{font-size:12px}
+.sga-status-grid small{font-size:9px;color:var(--muted);line-height:1.4}
+.sga-search-row{display:grid;grid-template-columns:minmax(220px,360px) auto;gap:10px;align-items:center;justify-content:start}
+.sga-event-list{display:flex;flex-direction:column;gap:10px;margin-top:14px}
+.sga-event-card{display:grid;grid-template-columns:minmax(210px,1.4fr) repeat(4,minmax(120px,1fr));gap:12px;padding:12px;border:1px solid var(--line);border-radius:14px;background:var(--surface-2);align-items:center}
+.sga-event-card>div{display:flex;align-items:center;gap:10px}
+.sga-event-card>span{display:flex;flex-direction:column;gap:3px}
+.sga-event-card small{font-size:8px;color:var(--muted);text-transform:uppercase;letter-spacing:.05em}
+.sga-event-card strong{font-size:10px}
+
+@media(max-width:1000px){
+  .availability-slot-row{grid-template-columns:1fr 1fr}.availability-slot-row .field:first-child{grid-column:1/-1}.slot-remove{justify-self:end}
+  .sga-status-grid{grid-template-columns:1fr 1fr}.sga-status-grid>div:first-child{grid-column:1/-1}
+  .sga-event-card{grid-template-columns:1fr 1fr}.sga-event-card>div{grid-column:1/-1}
+}
+@media(max-width:640px){
+  .availability-slot-row{grid-template-columns:1fr}.availability-slot-row .field:first-child{grid-column:auto}
+  .sga-status-grid,.sga-event-card,.sga-search-row{grid-template-columns:1fr}
+}
+.sga-catalog-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:10px;margin-top:14px}
+.sga-catalog-grid>div{border:1px solid var(--line);border-radius:14px;background:var(--surface-2);padding:12px;display:flex;flex-direction:column;gap:6px;max-height:240px;overflow:auto}
+.sga-catalog-grid h3{font-size:10px;text-transform:uppercase;letter-spacing:.05em;color:var(--muted);margin:0 0 4px}
+.sga-catalog-grid span{display:grid;grid-template-columns:58px 1fr;gap:8px;font-size:9px;border-top:1px solid var(--line);padding-top:6px}
+.sga-catalog-grid span strong{color:var(--yellow)}
+@media(max-width:800px){.sga-catalog-grid{grid-template-columns:1fr}}
+.warning-text{color:#c58a00!important}
+.sga-checks{display:flex;flex-wrap:wrap;gap:7px;margin-top:12px}
+.sga-checks span{padding:6px 9px;border-radius:999px;font-size:8.5px;font-weight:800;border:1px solid var(--line)}
+.sga-checks .ok{background:rgba(42,150,88,.1);color:#2c8d56}
+.sga-checks .fail{background:rgba(190,70,70,.09);color:#b44848}
