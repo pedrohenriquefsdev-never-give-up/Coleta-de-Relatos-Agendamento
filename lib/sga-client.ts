@@ -88,8 +88,128 @@ export async function listSgaPhotoTypes() {
   return sgaFetch("listar/tipo-foto/ativo");
 }
 
-export async function listSgaEventsByVehicle(plateOrCode: string) {
-  return sgaFetch(`listar/evento-veiculo/${encodeURIComponent(plateOrCode)}`);
+export function normalizeSgaPlate(value: unknown) {
+  return String(value || "").toUpperCase().replace(/[^A-Z0-9]/g, "").slice(0, 7);
+}
+
+export async function listSgaEventsByVehicle(plateOrCode: string | number) {
+  const lookup = String(plateOrCode || "").trim();
+  if (!lookup) throw new Error("SGA_EVENT_LOOKUP_EMPTY");
+  return sgaFetch(`listar/evento-veiculo/${encodeURIComponent(lookup)}`);
+}
+
+function asArray(value: any): any[] {
+  if (Array.isArray(value)) return value;
+  if (Array.isArray(value?.resultado)) return value.resultado;
+  if (Array.isArray(value?.veiculos)) return value.veiculos;
+  if (value && typeof value === "object" && (value.codigo_veiculo || value.placa)) return [value];
+  return [];
+}
+
+function eventsFrom(value: any): any[] {
+  if (Array.isArray(value)) return value;
+  if (Array.isArray(value?.eventos)) return value.eventos;
+  return [];
+}
+
+async function lookupVehicleByPlate(normalizedPlate: string) {
+  const trace: Array<{ step: string; lookup: string; ok: boolean; status?: number; message?: string }> = [];
+  const paths = [
+    `veiculo/buscar/${encodeURIComponent(normalizedPlate)}/placa`,
+    `veiculo/buscar/${encodeURIComponent(normalizedPlate)}`,
+  ];
+
+  let lastError: any = null;
+  for (const path of paths) {
+    try {
+      const data = await sgaFetch(path);
+      const vehicles = asArray(data);
+      const exact = vehicles.find((item) => normalizeSgaPlate(item?.placa) === normalizedPlate);
+      const vehicle = exact || vehicles[0] || null;
+      trace.push({ step: "vehicle", lookup: path, ok: Boolean(vehicle) });
+      if (vehicle) return { data, vehicle, trace, error: null };
+    } catch (error: any) {
+      lastError = error;
+      trace.push({
+        step: "vehicle",
+        lookup: path,
+        ok: false,
+        ...(error?.status ? { status: Number(error.status) } : {}),
+        message: String(error?.message || error),
+      });
+    }
+  }
+
+  return { data: null, vehicle: null, trace, error: lastError };
+}
+
+export async function resolveSgaEventsByPlate(value: unknown) {
+  const normalizedPlate = normalizeSgaPlate(value);
+  if (!normalizedPlate) throw new Error("SGA_PLATE_EMPTY");
+
+  const trace: Array<{ step: string; lookup: string; ok: boolean; status?: number; message?: string }> = [];
+  let lastError: any = null;
+  let emptyEventDataByVehicleCode: any = null;
+
+  // Caminho principal: resolve primeiro o veículo pelo endpoint específico de placa.
+  const vehicleLookup = await lookupVehicleByPlate(normalizedPlate);
+  const vehicleCode = String(vehicleLookup.vehicle?.codigo_veiculo ?? vehicleLookup.vehicle?.codigo ?? "").trim();
+  trace.push(...vehicleLookup.trace);
+  if (vehicleLookup.error) lastError = vehicleLookup.error;
+
+  if (vehicleCode) {
+    try {
+      const data = await listSgaEventsByVehicle(vehicleCode);
+      trace.push({ step: "event_by_vehicle_code", lookup: vehicleCode, ok: true });
+      if (eventsFrom(data).length > 0) {
+        return { data, normalizedPlate, vehicleCode, vehicle: vehicleLookup.vehicle, resolvedBy: "vehicle_code", trace };
+      }
+      emptyEventDataByVehicleCode = data;
+      // Mesmo sem eventos, ainda tentamos a placa diretamente como fallback.
+    } catch (error: any) {
+      lastError = error;
+      trace.push({
+        step: "event_by_vehicle_code",
+        lookup: vehicleCode,
+        ok: false,
+        ...(error?.status ? { status: Number(error.status) } : {}),
+        message: String(error?.message || error),
+      });
+    }
+  }
+
+  // Fallback: alguns ambientes do SGA aceitam a placa diretamente no endpoint de eventos.
+  try {
+    const data = await listSgaEventsByVehicle(normalizedPlate);
+    trace.push({ step: "event_by_plate", lookup: normalizedPlate, ok: true });
+    return { data, normalizedPlate, vehicleCode, vehicle: vehicleLookup.vehicle, resolvedBy: "plate", trace };
+  } catch (error: any) {
+    lastError = error;
+    trace.push({
+      step: "event_by_plate",
+      lookup: normalizedPlate,
+      ok: false,
+      ...(error?.status ? { status: Number(error.status) } : {}),
+      message: String(error?.message || error),
+    });
+  }
+
+  if (vehicleCode && emptyEventDataByVehicleCode != null) {
+    return {
+      data: emptyEventDataByVehicleCode,
+      normalizedPlate,
+      vehicleCode,
+      vehicle: vehicleLookup.vehicle,
+      resolvedBy: "vehicle_code",
+      trace,
+    };
+  }
+
+  const finalError: any = lastError instanceof Error ? lastError : new Error("SGA_EVENT_NOT_FOUND");
+  finalError.trace = trace;
+  finalError.normalizedPlate = normalizedPlate;
+  finalError.vehicleCode = vehicleCode;
+  throw finalError;
 }
 
 export async function uploadSgaEventDocument({

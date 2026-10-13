@@ -19,6 +19,7 @@ export default function SGAPage() {
   const [plate, setPlate] = useState("");
   const [searching, setSearching] = useState(false);
   const [eventResult, setEventResult] = useState<any>(null);
+  const [eventResolution, setEventResolution] = useState<any>(null);
 
   async function token() { return user?.getIdToken(); }
 
@@ -48,6 +49,7 @@ export default function SGAPage() {
     setSearching(true);
     setError("");
     setEventResult(null);
+    setEventResolution(null);
     try {
       const t = await token();
       const res = await fetch(`/api/sga/event?plate=${encodeURIComponent(cleaned)}&t=${Date.now()}`, {
@@ -57,6 +59,7 @@ export default function SGAPage() {
       const data = await res.json().catch(() => ({}));
       if (!res.ok) throw new Error(`${data.error || "Falha ao consultar o SGA."}${data.technical ? ` — ${data.technical}` : ""}`);
       setEventResult(data.data);
+      setEventResolution(data.resolution || null);
     } catch (e) {
       setError(e instanceof Error ? e.message : "Falha ao consultar o SGA.");
     } finally {
@@ -126,9 +129,18 @@ export default function SGAPage() {
           <div><h2>Consulta de evento por placa</h2><small>Valida a ligação entre a placa do Portal e o evento correto no SGA.</small></div>
         </div>
         <div className="sga-search-row">
-          <input className="input" value={plate} onChange={(e) => setPlate(e.target.value.toUpperCase().replace(/[^A-Z0-9]/g, "").slice(0, 7))} placeholder="ABC1D23" />
+          <input className="input" value={plate} onChange={(e) => setPlate(e.target.value.toUpperCase().replace(/[^A-Z0-9]/g, "").slice(0, 7))} placeholder="GPV0000 ou ABC1D23" />
           <button className="btn" onClick={searchPlate} disabled={searching}><Search size={15} /> {searching ? "Consultando..." : "Consultar SGA"}</button>
         </div>
+        <small className="field-help">Pode digitar com ou sem hífen. O Portal normaliza a placa e tenta localizar primeiro o veículo no SGA para consultar os eventos pelo código interno.</small>
+
+        {eventResolution?.resolvedBy && (
+          <div className="info-note sga-resolution-note">
+            Placa normalizada: <strong>{eventResolution.normalizedPlate || plate}</strong>
+            {eventResolution.vehicleCode ? <> • veículo SGA <strong>{eventResolution.vehicleCode}</strong></> : null}
+            {eventResolution.resolvedBy === "vehicle_code" ? " • evento localizado pelo código do veículo" : " • evento localizado diretamente pela placa"}.
+          </div>
+        )}
 
         {eventResult && events.length === 0 && <div className="empty compact-empty">Nenhum evento localizado para esta placa.</div>}
         {events.length > 0 && (

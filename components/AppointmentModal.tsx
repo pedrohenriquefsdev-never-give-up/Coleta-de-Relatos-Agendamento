@@ -284,13 +284,19 @@ export default function AppointmentModal({
 
       const eventData = await eventResponse.json().catch(() => ({}));
       const catalogData = await catalogResponse.json().catch(() => ({}));
-      if (!eventResponse.ok) throw new Error(eventData.error || "Não foi possível localizar o evento no SGA.");
+      if (!eventResponse.ok) throw new Error(`${eventData.error || "Não foi possível localizar o evento no SGA."}${eventData.technical ? ` — ${eventData.technical}` : ""}`);
       if (!catalogResponse.ok) throw new Error(catalogData.error || "Não foi possível carregar as classificações do SGA.");
 
       const events = Array.isArray(eventData.data?.eventos) ? eventData.data.eventos as SgaEvent[] : [];
       const photoTypes = Array.isArray(catalogData.photoTypes) ? catalogData.photoTypes as SgaPhotoType[] : catalogData.photoTypes ? [catalogData.photoTypes as SgaPhotoType] : [];
       setSgaEvents(events);
       setSgaPhotoTypes(photoTypes);
+      if (events.length > 0 && eventData.resolution?.resolvedBy) {
+        const vehicleCode = eventData.resolution?.vehicleCode ? ` • veículo SGA ${eventData.resolution.vehicleCode}` : "";
+        setSgaMessage(eventData.resolution.resolvedBy === "vehicle_code"
+          ? `Evento localizado pelo código interno do veículo${vehicleCode}.`
+          : "Evento localizado diretamente pela placa.");
+      }
 
       if (!catalogData.checks?.photoTypes?.ok) {
         setSgaCatalogWarning("O token não conseguiu listar as classificações de arquivo. Habilite Vistoria → listar tipo foto para realizar o upload.");
@@ -615,7 +621,8 @@ export default function AppointmentModal({
         <div className="grid-2">
           <div className="field">
             <label>Placa *</label>
-            <input className="input" disabled={readOnly} value={form.plate} onChange={(e) => setForm({ ...form, plate: cleanPlate(e.target.value) })} placeholder="ABC1D23" />
+            <input className="input" disabled={readOnly} value={form.plate} onChange={(e) => setForm({ ...form, plate: cleanPlate(e.target.value) })} placeholder="GPV0000 ou ABC1D23" />
+            {!readOnly && <small className="field-help">Pode digitar com ou sem hífen. O Portal salva a placa normalizada sem caracteres especiais.</small>}
           </div>
           <div className="field">
             <label>Nome completo *</label>

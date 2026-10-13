@@ -3,7 +3,7 @@ import { FieldValue } from "firebase-admin/firestore";
 import { adminDb } from "@/lib/firebase-admin";
 import { requireUser, isDeveloper } from "@/lib/server-auth";
 import { safeServerError } from "@/lib/server-error";
-import { listSgaEventsByVehicle, listSgaPhotoTypes, uploadSgaEventDocument } from "@/lib/sga-client";
+import { listSgaPhotoTypes, resolveSgaEventsByPlate, uploadSgaEventDocument } from "@/lib/sga-client";
 import { loadCallHistoryData } from "@/lib/call-history-data";
 import { buildCallHistoryPdf } from "@/lib/call-history-pdf";
 
@@ -57,8 +57,8 @@ export async function POST(req: NextRequest) {
     const plate = String(report.appointment.plate || "").toUpperCase().replace(/[^A-Z0-9]/g, "");
     if (!plate) return Response.json({ error: "O agendamento não possui uma placa válida." }, { status: 400 });
 
-    const eventsData = await listSgaEventsByVehicle(plate);
-    const events = eventArray(eventsData);
+    const resolvedEvents = await resolveSgaEventsByPlate(plate);
+    const events = eventArray(resolvedEvents.data);
     const selectedEvent = events.find((item) => String(item?.codigo_evento ?? "") === eventCode && String(item?.codigo_veiculo ?? "") === vehicleCode);
     if (!selectedEvent) {
       return Response.json({ error: "O evento selecionado não corresponde mais à placa deste agendamento. Consulte o SGA novamente." }, { status: 409 });
@@ -143,6 +143,8 @@ export async function POST(req: NextRequest) {
         photoTypeName: uploadMeta.photoTypeName,
         filename,
         attemptCount: report.attempts.length,
+        eventLookupResolvedBy: resolvedEvents.resolvedBy,
+        resolvedVehicleCode: resolvedEvents.vehicleCode || "",
       },
       createdAt: FieldValue.serverTimestamp(),
     });

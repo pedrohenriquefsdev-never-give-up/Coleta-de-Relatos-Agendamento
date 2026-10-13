@@ -1,3 +1,14 @@
+## V1.39.10 — resolução robusta de placa/evento no SGA
+
+- Placas são normalizadas para maiúsculas e sem hífen/espaços no Portal (`GPV-0000`, `gpv0000` e `GPV0000` convergem para `GPV0000`).
+- A consulta SGA deixa de depender primeiro de `listar/evento-veiculo/{placa}`.
+- O Portal busca o veículo por placa em `veiculo/buscar/{placa}/placa`, obtém `codigo_veiculo` e consulta os eventos pelo código interno.
+- Se a busca por código não retornar evento, a consulta direta pela placa continua como fallback.
+- A tela SGA informa a placa normalizada, o código do veículo localizado e qual estratégia encontrou o evento.
+- O botão “Localizar evento” do agendamento usa a mesma resolução e passa a exibir também o erro técnico retornado pelo SGA quando todos os caminhos falharem.
+- O envio do PDF revalida o evento usando a mesma lógica antes de anexar o documento, evitando divergência entre consulta e envio.
+- Nenhuma ENV, permissão de usuário ou regra do Firestore foi adicionada nesta versão.
+
 
 ## V1.39.9 — operador da coleta separado de quem agenda
 
