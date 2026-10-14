@@ -1,5 +1,5 @@
 import { NextRequest } from "next/server";
-import { requireUser } from "@/lib/server-auth";
+import { isDeveloper, requireUser } from "@/lib/server-auth";
 import { normalizeSgaPlate, resolveSgaEventsByPlate } from "@/lib/sga-client";
 import { safeServerError } from "@/lib/server-error";
 
@@ -7,8 +7,10 @@ export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
 export async function GET(req: NextRequest) {
+  let developerMode = false;
   try {
-    await requireUser(req);
+    const user = await requireUser(req);
+    developerMode = isDeveloper(user);
     const rawPlate = String(req.nextUrl.searchParams.get("plate") || "");
     const plate = normalizeSgaPlate(rawPlate);
     if (!plate) return Response.json({ error: "Informe uma placa válida." }, { status: 400 });
@@ -27,6 +29,7 @@ export async function GET(req: NextRequest) {
         referenceDate: result.referenceDate || referenceDate || null,
         vehicleContractDate: result.vehicleContractDate || null,
         windowsSearched: result.windowsSearched || 0,
+        developerDebug: developerMode ? result.generalDebug || null : null,
       },
     });
   } catch (e: any) {
@@ -45,6 +48,7 @@ export async function GET(req: NextRequest) {
         referenceDate: e?.referenceDate || null,
         vehicleContractDate: e?.vehicleContractDate || null,
         windowsSearched: Number(e?.windowsSearched || 0),
+        developerDebug: developerMode ? e?.generalDebug || null : null,
       },
     }, { status });
   }

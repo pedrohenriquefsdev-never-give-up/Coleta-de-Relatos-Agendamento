@@ -1,0 +1,1 @@
+V1.39.14 - diagnóstico sanitizado da listagem geral de eventos SGA, exclusivo do Desenvolvedor.

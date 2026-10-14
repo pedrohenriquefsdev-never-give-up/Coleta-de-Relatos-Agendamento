@@ -2093,3 +2093,18 @@
 
 /* V1.39.9 — autoria do agendamento x operador da coleta */
 .appointment-origin-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px;margin:2px 0 4px}.appointment-origin-grid>div{border:1px solid var(--line);background:var(--surface-2);border-radius:12px;padding:10px 12px;display:flex;flex-direction:column;gap:3px}.appointment-origin-grid small{font-size:10px;text-transform:uppercase;letter-spacing:.06em;color:var(--muted)}.appointment-origin-grid strong{font-size:12px}.appointment-scheduler{display:block;margin-top:2px;color:var(--muted);font-size:10px}@media(max-width:720px){.appointment-origin-grid{grid-template-columns:1fr}}
+
+/* V1.39.14 — diagnóstico técnico SGA somente para Desenvolvedor */
+.sga-debug-panel{margin-top:12px;border:1px solid var(--line);border-radius:14px;background:var(--surface-2);overflow:hidden}
+.sga-debug-panel>summary{cursor:pointer;padding:12px 14px;font-weight:800;font-size:11px;letter-spacing:.02em}
+.sga-debug-panel[open]>summary{border-bottom:1px solid var(--line)}
+.sga-debug-summary{display:flex;flex-wrap:wrap;gap:8px;padding:12px 14px}
+.sga-debug-summary>span{display:flex;gap:5px;align-items:center;border:1px solid var(--line);border-radius:10px;padding:7px 9px;font-size:9px;background:var(--surface)}
+.sga-debug-table-wrap{overflow:auto;border-top:1px solid var(--line);border-bottom:1px solid var(--line)}
+.sga-debug-table{width:100%;border-collapse:collapse;min-width:860px;font-size:9px}
+.sga-debug-table th,.sga-debug-table td{padding:8px 10px;text-align:left;border-bottom:1px solid var(--line);white-space:nowrap}
+.sga-debug-table th{font-size:8px;text-transform:uppercase;letter-spacing:.04em;color:var(--muted)}
+.sga-debug-table tr.debug-hit td{font-weight:800}
+.sga-debug-structure{display:flex;flex-direction:column;gap:7px;padding:12px 14px;font-size:9px;line-height:1.5;word-break:break-word}
+.sga-debug-structure>strong{font-size:10px}
+.sga-debug-panel>small{display:block;padding:0 14px 12px;color:var(--muted)}

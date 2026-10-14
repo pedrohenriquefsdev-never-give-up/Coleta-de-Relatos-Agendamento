@@ -219,3 +219,13 @@ Esta versão não adiciona novas gravações diretas pelo navegador. As informa�
 - A correspondência continua estrita: somente eventos cuja placa normalizada seja exatamente a placa consultada são aceitos.
 - A mesma data de referência é usada na revalidação feita imediatamente antes do envio do PDF ao SGA.
 - O diagnóstico exibe data de referência, data de contrato e quantidade de janelas pesquisadas.
+
+
+## V1.39.14 — diagnóstico técnico da listagem de eventos SGA
+
+- Mantém integralmente a busca histórica e a validação estrita de placa da V1.39.13.
+- O teste de conexão agora valida também o endpoint **Evento → Listar**, ajudando a identificar permissão faltante no token ou no usuário exclusivo da API.
+- Em consultas feitas pela conta Desenvolvedor, o backend registra um diagnóstico sanitizado de cada página retornada pelo `POST listar/evento`: janela, quantidade de registros, formato da resposta, paginação, chaves disponíveis, caminhos que contêm placa e códigos de veículo observados.
+- Placas de terceiros são mascaradas no diagnóstico; a placa pesquisada permanece visível apenas quando houver correspondência exata.
+- O diagnóstico técnico não é enviado para Administrador, Atendente ou Consulta.
+- Nenhuma regra de segurança foi relaxada e nenhum evento é aceito por aproximação: o upload continua bloqueado sem correspondência confirmada da placa.

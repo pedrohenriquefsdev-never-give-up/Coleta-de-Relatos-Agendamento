@@ -111,11 +111,18 @@ export default function SGAPage() {
               <span className={diagnostic.checks?.departments?.ok ? "ok" : "fail"}>Atendimento / departamentos: {diagnostic.checks?.departments?.ok ? "OK" : diagnostic.checks?.departments?.error || "Sem permissão"}</span>
               <span className={diagnostic.checks?.statuses?.ok ? "ok" : "fail"}>Atendimento / status: {diagnostic.checks?.statuses?.ok ? "OK" : diagnostic.checks?.statuses?.error || "Sem permissão"}</span>
               <span className={diagnostic.checks?.types?.ok ? "ok" : "fail"}>Atendimento / tipos: {diagnostic.checks?.types?.ok ? "OK" : diagnostic.checks?.types?.error || "Sem permissão"}</span>
+              <span className={diagnostic.checks?.generalEvents?.ok ? "ok" : "fail"}>Evento / listar geral: {diagnostic.checks?.generalEvents?.ok ? "OK" : diagnostic.checks?.generalEvents?.error || "Sem permissão"}</span>
             </div>
 
             {!diagnostic.checks?.photoTypes?.ok && (
               <div className="info-note sga-permission-note">
                 Para anexar o PDF ao Evento, habilite também no token a permissão <strong>Vistoria → listar tipo foto</strong>. O SGA exige o código da classificação no upload do documento.
+              </div>
+            )}
+
+            {!diagnostic.checks?.generalEvents?.ok && (
+              <div className="info-note sga-permission-note">
+                A credencial autenticou, mas o teste do endpoint geral falhou. Confira no SGA a permissão <strong>Evento → Listar</strong> tanto no token da aplicação quanto no usuário exclusivo da API.
               </div>
             )}
 
@@ -151,6 +158,55 @@ export default function SGAPage() {
               </span>
             ))}
           </div>
+        )}
+
+        {eventResolution?.developerDebug && (
+          <details className="sga-debug-panel" open>
+            <summary>Diagnóstico técnico V1.39.14 — somente Desenvolvedor</summary>
+            <div className="sga-debug-summary">
+              <span>Placa alvo <strong>{eventResolution.developerDebug.targetPlate || plate}</strong></span>
+              <span>Veículo alvo <strong>{eventResolution.developerDebug.targetVehicleCode || "—"}</strong></span>
+              <span>Página solicitada <strong>{eventResolution.developerDebug.pageSize || "—"} registros</strong></span>
+              <span>Páginas capturadas <strong>{Array.isArray(eventResolution.developerDebug.pages) ? eventResolution.developerDebug.pages.length : 0}</strong></span>
+            </div>
+            <div className="sga-debug-table-wrap">
+              <table className="sga-debug-table">
+                <thead>
+                  <tr><th>Janela</th><th>Pág.</th><th>Retorno</th><th>Placa conhecida</th><th>Qualquer campo placa</th><th>Cód. veículo</th><th>Formato</th></tr>
+                </thead>
+                <tbody>
+                  {(Array.isArray(eventResolution.developerDebug.pages) ? eventResolution.developerDebug.pages : []).slice(0, 40).map((item: any, index: number) => (
+                    <tr key={`${item.window}-${item.page}-${index}`} className={item.anyPlateFieldExactMatches > 0 || item.exactVehicleCodeMatches > 0 ? "debug-hit" : ""}>
+                      <td>{item.window}</td>
+                      <td>{item.page}</td>
+                      <td>{item.rawCount}</td>
+                      <td>{item.knownExactPlateMatches}</td>
+                      <td>{item.anyPlateFieldExactMatches}</td>
+                      <td>{item.exactVehicleCodeMatches}</td>
+                      <td>{item.responseShape}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+            {(() => {
+              const pages = Array.isArray(eventResolution.developerDebug.pages) ? eventResolution.developerDebug.pages : [];
+              const structure = pages.find((item: any) => item.anyPlateFieldExactMatches > 0 || item.exactVehicleCodeMatches > 0) || pages.find((item: any) => item.rawCount > 0) || pages[0];
+              if (!structure) return <div className="sga-debug-structure">Nenhuma resposta de página foi capturada.</div>;
+              return (
+                <div className="sga-debug-structure">
+                  <strong>Estrutura observada em {structure.window} / página {structure.page}</strong>
+                  <span><b>Chaves do evento:</b> {Array.isArray(structure.eventKeys) && structure.eventKeys.length ? structure.eventKeys.join(", ") : "—"}</span>
+                  <span><b>Chaves de veiculo:</b> {Array.isArray(structure.vehicleKeys) && structure.vehicleKeys.length ? structure.vehicleKeys.join(", ") : "—"}</span>
+                  <span><b>Caminhos contendo placa:</b> {Array.isArray(structure.detectedPlatePaths) && structure.detectedPlatePaths.length ? structure.detectedPlatePaths.join(", ") : "nenhum"}</span>
+                  <span><b>Amostras de placas:</b> {Array.isArray(structure.returnedPlateSamples) && structure.returnedPlateSamples.length ? structure.returnedPlateSamples.join(", ") : "nenhuma"}</span>
+                  <span><b>Códigos de veículo observados:</b> {Array.isArray(structure.vehicleCodeSamples) && structure.vehicleCodeSamples.length ? structure.vehicleCodeSamples.join(", ") : "nenhum"}</span>
+                  {structure.pagination ? <span><b>Paginação informada pelo SGA:</b> total {structure.pagination.total ?? "—"}, páginas {structure.pagination.numberPages ?? "—"}, página atual {structure.pagination.currentPage ?? "—"}, mostrando {structure.pagination.showing ?? "—"}</span> : <span><b>Paginação informada pelo SGA:</b> não veio no retorno.</span>}
+                </div>
+              );
+            })()}
+            {eventResolution.developerDebug.capped && <small>O diagnóstico foi limitado para evitar resposta excessiva do servidor.</small>}
+          </details>
         )}
 
         {eventResolution?.resolvedBy && (

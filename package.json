@@ -1,6 +1,6 @@
 {
   "name": "portal-coleta-relatos",
-  "version": "1.39.13",
+  "version": "1.39.14",
   "private": true,
   "scripts": {
     "dev": "next dev",

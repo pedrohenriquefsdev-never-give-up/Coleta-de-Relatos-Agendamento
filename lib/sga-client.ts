@@ -251,6 +251,155 @@ type SgaResolutionTrace = {
   returnedPlates?: string[];
 };
 
+type SgaGeneralListDebugPage = {
+  window: string;
+  page: number;
+  rawCount: number;
+  responseShape: "array" | "object" | "other";
+  responseKeys: string[];
+  pagination: {
+    total: number | null;
+    numberPages: number | null;
+    currentPage: number | null;
+    showing: number | null;
+  } | null;
+  knownExactPlateMatches: number;
+  anyPlateFieldExactMatches: number;
+  exactVehicleCodeMatches: number;
+  eventKeys: string[];
+  vehicleKeys: string[];
+  detectedPlatePaths: string[];
+  returnedPlateSamples: string[];
+  vehicleCodeSamples: string[];
+};
+
+type SgaGeneralListDebug = {
+  targetPlate: string;
+  targetVehicleCode: string;
+  pageSize: number;
+  pages: SgaGeneralListDebugPage[];
+  capped: boolean;
+};
+
+function safeNumber(value: unknown) {
+  if (value === null || value === undefined || value === "") return null;
+  const n = Number(value);
+  return Number.isFinite(n) ? n : null;
+}
+
+function responseShape(value: any): "array" | "object" | "other" {
+  if (Array.isArray(value)) return "array";
+  if (value && typeof value === "object") return "object";
+  return "other";
+}
+
+function collectPrimitivePaths(
+  value: any,
+  matcher: (key: string, path: string) => boolean,
+  path = "",
+  depth = 0,
+  output: Array<{ path: string; value: string }> = [],
+) {
+  if (!value || typeof value !== "object" || depth > 3 || output.length >= 80) return output;
+  const entries = Array.isArray(value) ? value.slice(0, 8).map((item, index) => [String(index), item] as const) : Object.entries(value);
+  for (const [key, child] of entries) {
+    if (output.length >= 80) break;
+    const childPath = path ? `${path}.${key}` : key;
+    if (matcher(key, childPath) && (typeof child === "string" || typeof child === "number")) {
+      output.push({ path: childPath, value: String(child) });
+    }
+    if (child && typeof child === "object") collectPrimitivePaths(child, matcher, childPath, depth + 1, output);
+  }
+  return output;
+}
+
+function debugPlateFields(event: any) {
+  return collectPrimitivePaths(event, (key) => key.toLowerCase().includes("placa"));
+}
+
+function debugVehicleCodeFields(event: any) {
+  return collectPrimitivePaths(event, (key, path) => {
+    const compactKey = key.toLowerCase().replace(/[^a-z0-9]/g, "");
+    const compactPath = path.toLowerCase().replace(/[^a-z0-9.]/g, "");
+    return compactKey === "codigoveiculo" || compactPath.endsWith("veiculo.codigo");
+  });
+}
+
+function maskDebugPlate(value: unknown, targetPlate: string) {
+  const normalized = normalizeSgaPlate(value);
+  if (!normalized) return "";
+  if (normalized === targetPlate) return normalized;
+  return `${normalized.slice(0, 3)}****`;
+}
+
+function makeGeneralDebugPage(
+  data: any,
+  rawEvents: any[],
+  normalizedPlate: string,
+  vehicleCode: string,
+  label: string,
+  page: number,
+): SgaGeneralListDebugPage {
+  const eventKeySet = new Set<string>();
+  const vehicleKeySet = new Set<string>();
+  const platePathSet = new Set<string>();
+  const plateSamples = new Set<string>();
+  const vehicleCodeSamples = new Set<string>();
+  let anyPlateFieldExactMatches = 0;
+  let exactVehicleCodeMatches = 0;
+
+  for (const event of rawEvents.slice(0, 100)) {
+    if (event && typeof event === "object") Object.keys(event).forEach((key) => eventKeySet.add(key));
+    if (event?.veiculo && typeof event.veiculo === "object") Object.keys(event.veiculo).forEach((key) => vehicleKeySet.add(key));
+
+    const plateFields = debugPlateFields(event);
+    let eventHasExactPlate = false;
+    for (const item of plateFields) {
+      platePathSet.add(item.path);
+      const masked = maskDebugPlate(item.value, normalizedPlate);
+      if (masked) plateSamples.add(masked);
+      if (normalizeSgaPlate(item.value) === normalizedPlate) eventHasExactPlate = true;
+    }
+    if (eventHasExactPlate) anyPlateFieldExactMatches += 1;
+
+    const codeFields = debugVehicleCodeFields(event);
+    let eventHasVehicleCode = false;
+    for (const item of codeFields) {
+      const code = String(item.value || "").trim();
+      if (code) vehicleCodeSamples.add(code);
+      if (vehicleCode && code === vehicleCode) eventHasVehicleCode = true;
+    }
+    if (eventHasVehicleCode) exactVehicleCodeMatches += 1;
+  }
+
+  const paginationRaw = data?.paginacao;
+  const pagination = paginationRaw && typeof paginationRaw === "object"
+    ? {
+        total: safeNumber(paginationRaw.total),
+        numberPages: safeNumber(paginationRaw.numero_paginas ?? paginationRaw.total_paginas),
+        currentPage: safeNumber(paginationRaw.pagina_corrente ?? paginationRaw.pagina_atual),
+        showing: safeNumber(paginationRaw.mostrando ?? paginationRaw.quantidade),
+      }
+    : null;
+
+  return {
+    window: label,
+    page: page + 1,
+    rawCount: rawEvents.length,
+    responseShape: responseShape(data),
+    responseKeys: data && typeof data === "object" && !Array.isArray(data) ? Object.keys(data).slice(0, 30) : [],
+    pagination,
+    knownExactPlateMatches: rawEvents.filter((event) => eventPlateOf(event) === normalizedPlate).length,
+    anyPlateFieldExactMatches,
+    exactVehicleCodeMatches,
+    eventKeys: Array.from(eventKeySet).sort().slice(0, 60),
+    vehicleKeys: Array.from(vehicleKeySet).sort().slice(0, 40),
+    detectedPlatePaths: Array.from(platePathSet).sort().slice(0, 30),
+    returnedPlateSamples: Array.from(plateSamples).slice(0, 12),
+    vehicleCodeSamples: Array.from(vehicleCodeSamples).slice(0, 12),
+  };
+}
+
 async function lookupVehicleByPlate(normalizedPlate: string) {
   const trace: SgaResolutionTrace[] = [];
   const paths = [
@@ -356,6 +505,13 @@ async function lookupEventsInGeneralList(
   const windowDays = 30;
   const pageSize = 500;
   const hardPageSafetyLimit = 100;
+  const generalDebug: SgaGeneralListDebug = {
+    targetPlate: normalizedPlate,
+    targetVehicleCode: vehicleCodeOf(exactVehicle),
+    pageSize,
+    pages: [],
+    capped: false,
+  };
   let cursorEnd = referenceDate;
   let windowsSearched = 0;
 
@@ -375,6 +531,19 @@ async function lookupEventsInGeneralList(
         const rawEvents = eventsFrom(data);
         const normalizedEvents = rawEvents.map(normalizeSgaEvent);
         matchesInWindow.push(...normalizedEvents.filter((event) => eventPlateOf(event) === normalizedPlate));
+
+        if (generalDebug.pages.length < 180) {
+          generalDebug.pages.push(makeGeneralDebugPage(
+            data,
+            rawEvents,
+            normalizedPlate,
+            generalDebug.targetVehicleCode,
+            label,
+            page,
+          ));
+        } else {
+          generalDebug.capped = true;
+        }
 
         const totalPagesRaw = data?.paginacao?.numero_paginas ?? data?.paginacao?.total_paginas;
         const totalPages = Number(totalPagesRaw);
@@ -418,6 +587,7 @@ async function lookupEventsInGeneralList(
         referenceDate: formatIsoDate(referenceDate),
         vehicleContractDate: parsedContractDate ? formatIsoDate(lowerBound) : null,
         windowsSearched,
+        generalDebug,
       };
     }
 
@@ -433,6 +603,7 @@ async function lookupEventsInGeneralList(
     referenceDate: formatIsoDate(referenceDate),
     vehicleContractDate: parsedContractDate ? formatIsoDate(lowerBound) : null,
     windowsSearched,
+    generalDebug,
   };
 }
 
@@ -551,6 +722,7 @@ export async function resolveSgaEventsByPlate(value: unknown, options: { referen
       referenceDate: generalLookup.referenceDate,
       vehicleContractDate: generalLookup.vehicleContractDate,
       windowsSearched: generalLookup.windowsSearched,
+      generalDebug: generalLookup.generalDebug,
     };
   }
 
@@ -565,6 +737,7 @@ export async function resolveSgaEventsByPlate(value: unknown, options: { referen
   finalError.referenceDate = generalLookup.referenceDate;
   finalError.vehicleContractDate = generalLookup.vehicleContractDate;
   finalError.windowsSearched = generalLookup.windowsSearched;
+  finalError.generalDebug = generalLookup.generalDebug;
   throw finalError;
 }
 

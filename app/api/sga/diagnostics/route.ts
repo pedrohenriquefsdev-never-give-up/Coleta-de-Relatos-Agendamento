@@ -8,6 +8,7 @@ import {
   listSgaTypes,
   listSgaEventSituations,
   listSgaPhotoTypes,
+  listSgaEventsByDateRange,
 } from "@/lib/sga-client";
 import { safeServerError } from "@/lib/server-error";
 
@@ -26,12 +27,14 @@ export async function GET(req: NextRequest) {
     if (!config.configured) return Response.json({ ok: false, config, error: "Integração SGA ainda não configurada na Vercel." }, { status: 503 });
 
     await authenticateSga(true);
-    const [departmentsCheck, statusesCheck, typesCheck, eventSituationsCheck, photoTypesCheck] = await Promise.all([
+    const today = new Date();
+    const [departmentsCheck, statusesCheck, typesCheck, eventSituationsCheck, photoTypesCheck, generalEventsCheck] = await Promise.all([
       check(listSgaDepartments),
       check(listSgaStatuses),
       check(listSgaTypes),
       check(listSgaEventSituations),
       check(listSgaPhotoTypes),
+      check(() => listSgaEventsByDateRange(today, today, 0, 1)),
     ]);
 
     return Response.json({
@@ -49,6 +52,7 @@ export async function GET(req: NextRequest) {
         types: { ok: typesCheck.ok, error: typesCheck.error },
         eventSituations: { ok: eventSituationsCheck.ok, error: eventSituationsCheck.error },
         photoTypes: { ok: photoTypesCheck.ok, error: photoTypesCheck.error },
+        generalEvents: { ok: generalEventsCheck.ok, error: generalEventsCheck.error },
       },
     });
   } catch (e: any) {
