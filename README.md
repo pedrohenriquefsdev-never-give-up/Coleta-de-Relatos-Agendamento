@@ -1,3 +1,14 @@
+## V1.39.21 — diagnóstico direto pelos endpoints oficiais do SGA
+
+- Substitui o diagnóstico por protocolo por um teste direto, curto e exclusivo do Desenvolvedor.
+- Não executa a varredura histórica de eventos.
+- Compara `veiculo/buscar/{placa}/placa` com `veiculo/buscar-por-permissao/{placa}/placa`.
+- Testa `listar/evento-veiculo` com placa antiga mascarada, placa normalizada e código interno do veículo localizado.
+- Testa `POST listar/evento` somente com `data_cadastro` do dia informado, sem paginação e sem intervalo.
+- Exibe HTTP, formato do retorno, quantidade de registros, amostras de placas/códigos e os dados essenciais dos eventos retornados, inclusive respostas de outras placas.
+- A consulta operacional por placa e o envio de PDF permanecem inalterados.
+- Nenhuma nova variável de ambiente, regra de Firestore ou permissão de usuário foi adicionada.
+
 ## V1.39.11 — correspondência estrita de placa no SGA
 
 - Corrige o resolvedor que, na V1.39.10, podia usar o primeiro veículo retornado pelo SGA quando a placa exata não era encontrada.
