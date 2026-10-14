@@ -207,8 +207,9 @@ export default function AppointmentModal({
       .sort((a, b) => a.time.localeCompare(b.time));
   }, [existingAppointments, form.assignedTo, form.date, form.durationMinutes, form.time, initial?.id]);
 
-  async function getToken() {
-    return user?.getIdToken();
+  async function getToken(): Promise<string> {
+    if (!user) throw new Error("Sessão não encontrada. Faça login novamente.");
+    return user.getIdToken();
   }
 
 

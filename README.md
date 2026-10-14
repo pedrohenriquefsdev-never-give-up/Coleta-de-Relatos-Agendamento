@@ -241,3 +241,22 @@ Esta versão não adiciona novas gravações diretas pelo navegador. As informa�
 - Depois que uma combinação é aceita pelo SGA, ela é reutilizada nas janelas históricas seguintes até a data de contrato/cadastro do veículo.
 - A validação estrita de placa permanece inalterada: nenhum evento de outra placa pode ser selecionado ou receber PDF.
 - Nenhuma nova ENV ou regra de Firestore é necessária.
+
+
+## V1.39.16 — busca segmentada e diagnóstico de etapa
+
+- A busca histórica do SGA passa a ser executada em blocos curtos, evitando que uma única requisição longa estoure o tempo do backend da Vercel.
+- O usuário continua clicando apenas uma vez: o navegador avança automaticamente pelos blocos históricos até localizar o evento ou chegar à data de contrato do veículo.
+- A varredura geral só começa depois que o veículo exato da placa foi localizado; sem veículo confiável, o Portal encerra com diagnóstico controlado em vez de pesquisar anos de histórico.
+- Cada bloco possui orçamento de tempo e de chamadas ao SGA. Falhas isoladas são registradas e não derrubam a consulta inteira.
+- O diagnóstico do Desenvolvedor mostra blocos automáticos, quantidade de chamadas, tempo acumulado, motivo da última parada, HTTP e etapa/endpoint que falhou.
+- A tela de agendamento usa a mesma continuação automática ao carregar os eventos da placa.
+- No envio do PDF, quando o Portal já conhece o protocolo do evento selecionado, a revalidação é feita diretamente pelo protocolo no backend, sem exigir que o operador digite ou pesquise protocolo no SGA.
+- A validação final continua estrita: protocolo, código do evento, código do veículo e placa precisam continuar correspondendo antes do upload.
+- Nenhuma nova variável de ambiente ou regra de Firestore é necessária.
+
+
+## V1.39.17 — correção de build TypeScript
+
+- `getToken()` agora retorna `Promise<string>` de forma estrita e lança erro de sessão quando o usuário não está disponível.
+- Corrige o erro TS2345 em `AppointmentModal.tsx` sem alterar a lógica da integração SGA da V1.39.16.

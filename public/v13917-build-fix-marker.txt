@@ -1,0 +1,1 @@
+V1.39.17 - correção TypeScript no token de autenticação; lógica SGA preservada da V1.39.16.
