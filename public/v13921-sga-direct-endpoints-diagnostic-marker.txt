@@ -1,0 +1,1 @@
+V1.39.21 - diagnostico direto dos endpoints oficiais SGA: veiculo comum/permissao, evento-veiculo por placa/codigo e listar/evento por data exata.

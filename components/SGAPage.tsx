@@ -28,10 +28,10 @@ export default function SGAPage() {
   const [searching, setSearching] = useState(false);
   const [eventResult, setEventResult] = useState<any>(null);
   const [eventResolution, setEventResolution] = useState<any>(null);
-  const [protocolDiagnostic, setProtocolDiagnostic] = useState<any>(null);
-  const [protocolChecking, setProtocolChecking] = useState(false);
-  const [protocolError, setProtocolError] = useState("");
-  const [diagnosticProtocol, setDiagnosticProtocol] = useState("20265469");
+  const [directDiagnostic, setDirectDiagnostic] = useState<any>(null);
+  const [directChecking, setDirectChecking] = useState(false);
+  const [directError, setDirectError] = useState("");
+  const [directDiagnosticDate, setDirectDiagnosticDate] = useState("2026-10-13");
 
   async function token() { return user?.getIdToken(); }
 
@@ -55,30 +55,30 @@ export default function SGAPage() {
     }
   }
 
-  async function runProtocolDiagnostic() {
-    const protocol = diagnosticProtocol.trim();
-    if (!protocol) return setProtocolError("Informe um protocolo para o diagnóstico.");
-    setProtocolChecking(true);
-    setProtocolError("");
-    setProtocolDiagnostic(null);
+  async function runDirectDiagnostic() {
+    const normalizedPlate = plate.toUpperCase().replace(/[^A-Z0-9]/g, "");
+    if (!normalizedPlate) return setDirectError("Informe a placa no campo acima para executar o diagnóstico.");
+    setDirectChecking(true);
+    setDirectError("");
+    setDirectDiagnostic(null);
     try {
       const t = await token();
       const params = new URLSearchParams({
-        protocol,
-        plate: plate.toUpperCase().replace(/[^A-Z0-9]/g, ""),
+        plate: normalizedPlate,
+        date: directDiagnosticDate,
         t: String(Date.now()),
       });
-      const res = await fetch(`/api/sga/protocol-diagnostic?${params.toString()}`, {
+      const res = await fetch(`/api/sga/direct-diagnostic?${params.toString()}`, {
         headers: { Authorization: `Bearer ${t}` },
         cache: "no-store",
       });
       const data = await res.json().catch(() => ({}));
-      if (!res.ok) throw new Error(`${data.error || "Falha no diagnóstico por protocolo."}${data.technical ? ` — ${data.technical}` : ""}`);
-      setProtocolDiagnostic(data);
+      if (!res.ok) throw new Error(`${data.error || "Falha no diagnóstico direto do SGA."}${data.technical ? ` — ${data.technical}` : ""}`);
+      setDirectDiagnostic(data);
     } catch (e) {
-      setProtocolError(e instanceof Error ? e.message : "Falha no diagnóstico por protocolo.");
+      setDirectError(e instanceof Error ? e.message : "Falha no diagnóstico direto do SGA.");
     } finally {
-      setProtocolChecking(false);
+      setDirectChecking(false);
     }
   }
 
@@ -252,51 +252,99 @@ export default function SGAPage() {
         {developer && (
           <div className="sga-debug-panel" style={{ marginTop: 12 }}>
             <div className="sga-debug-structure">
-              <strong>Diagnóstico direto V1.39.20 — protocolo conhecido</strong>
-              <span>Teste temporário exclusivo do Desenvolvedor. Ele não muda o fluxo do operador: serve apenas para verificar se a API consegue enxergar diretamente o evento de teste pelo protocolo.</span>
+              <strong>Diagnóstico direto V1.39.21 — endpoints oficiais</strong>
+              <span>Teste exclusivo do Desenvolvedor. Não faz varredura histórica: chama somente os endpoints documentados pela Hinova e mostra o retorno essencial sem descartar respostas de outras placas.</span>
               <div className="sga-search-row">
                 <input
                   className="input"
-                  value={diagnosticProtocol}
-                  onChange={(e) => setDiagnosticProtocol(e.target.value.replace(/[^0-9]/g, "").slice(0, 20))}
-                  placeholder="Protocolo do evento"
+                  type="date"
+                  value={directDiagnosticDate}
+                  onChange={(e) => setDirectDiagnosticDate(e.target.value)}
+                  aria-label="Data de cadastro do evento para diagnóstico"
                 />
-                <button className="btn" onClick={runProtocolDiagnostic} disabled={protocolChecking}>
-                  <Search size={15} /> {protocolChecking ? "Testando..." : "Testar protocolo"}
+                <button className="btn" onClick={runDirectDiagnostic} disabled={directChecking}>
+                  <Search size={15} /> {directChecking ? "Testando endpoints..." : "Executar diagnóstico direto"}
                 </button>
               </div>
-              <small>Placa usada na validação: <b>{plate || "nenhuma informada"}</b>. Para o teste atual, deixe <b>GPV0000</b> no campo de placa acima.</small>
-              {protocolError && <div className="error">{protocolError}</div>}
-              {protocolDiagnostic && (
+              <small>Para o evento teste atual: placa <b>{plate || "não informada"}</b> • data de cadastro <b>{directDiagnosticDate.split("-").reverse().join("/")}</b>.</small>
+              {directError && <div className="error">{directError}</div>}
+              {directDiagnostic && (
                 <>
                   <div className="sga-debug-summary">
-                    <span>Algum formato aceito <strong>{protocolDiagnostic.allRejected ? "NÃO" : "SIM"}</strong></span>
-                    <span>Formato aceito <strong>{protocolDiagnostic.acceptedVariantLabel || "—"}</strong></span>
-                    <span>Protocolo visível <strong>{protocolDiagnostic.protocolVisible ? "SIM" : "NÃO"}</strong></span>
-                    <span>Placa exata visível <strong>{protocolDiagnostic.exactPlateVisible ? "SIM" : "NÃO"}</strong></span>
+                    <span>Veículo busca comum <strong>{directDiagnostic.vehicleVisibleCommon ? "VISÍVEL" : "NÃO"}</strong></span>
+                    <span>Veículo por permissão <strong>{directDiagnostic.vehicleVisibleByPermission ? "VISÍVEL" : "NÃO"}</strong></span>
+                    <span>Código veículo <strong>{directDiagnostic.targetVehicleCode || "—"}</strong></span>
+                    <span>Evento encontrado <strong>{directDiagnostic.eventVisibleAnywhere ? "SIM" : "NÃO"}</strong></span>
                   </div>
-                  {Array.isArray(protocolDiagnostic.attempts) && protocolDiagnostic.attempts.length > 0 && (
-                    <div className="sga-debug-structure" style={{ marginTop: 8 }}>
-                      <strong>Tentativas isoladas em POST listar/evento</strong>
-                      {protocolDiagnostic.attempts.map((attempt: any, index: number) => (
-                        <span key={`protocol-attempt-${attempt.id || index}`}>
-                          <b>{index + 1}. {attempt.label || attempt.id || "Tentativa"}</b> • {attempt.accepted ? "ACEITA" : "REJEITADA"}
-                          {attempt.status ? ` • HTTP ${attempt.status}` : ""}
-                          {` • Corpo: ${JSON.stringify(attempt.body || {})}`}
-                          {attempt.responseShape ? ` • Retorno: ${attempt.responseShape}` : ""}
-                          {` • Registros: ${attempt.rawCount ?? 0}`}
-                          {` • Protocolo: ${attempt.protocolMatchCount ?? 0}`}
-                          {` • Placa exata: ${attempt.exactPlateMatchCount ?? 0}`}
-                          {attempt.message ? ` • ${attempt.message}` : ""}
-                        </span>
-                      ))}
+
+                  <div className="sga-debug-structure" style={{ marginTop: 8 }}>
+                    <strong>Chamadas executadas</strong>
+                    {(Array.isArray(directDiagnostic.tests) ? directDiagnostic.tests : []).map((test: any, index: number) => (
+                      <span key={`direct-test-${test.id || index}`}>
+                        <b>{index + 1}. {test.label || test.id}</b> • {test.method} {test.path} • {test.accepted ? "ACEITA" : "REJEITADA"}
+                        {test.status ? ` • HTTP ${test.status}` : ""}
+                        {test.body ? ` • Corpo: ${JSON.stringify(test.body)}` : ""}
+                        {test.responseShape ? ` • Retorno: ${test.responseShape}` : ""}
+                        {` • Registros: ${test.rawCount ?? 0}`}
+                        {` • Placa exata: ${test.exactPlateCount ?? 0}`}
+                        {typeof test.exactVehicleCodeCount === "number" ? ` • Cód. veículo alvo: ${test.exactVehicleCodeCount}` : ""}
+                        {test.message ? ` • ${test.message}` : ""}
+                        {Array.isArray(test.returnedPlateSamples) && test.returnedPlateSamples.length ? ` • Placas retornadas: ${test.returnedPlateSamples.join(", ")}` : ""}
+                        {Array.isArray(test.returnedVehicleCodeSamples) && test.returnedVehicleCodeSamples.length ? ` • Códigos retornados: ${test.returnedVehicleCodeSamples.join(", ")}` : ""}
+                      </span>
+                    ))}
+                  </div>
+
+                  {(Array.isArray(directDiagnostic.tests) ? directDiagnostic.tests : []).some((test: any) => Array.isArray(test.vehicles) && test.vehicles.length > 0) && (
+                    <div className="sga-debug-table-wrap" style={{ marginTop: 8 }}>
+                      <table className="sga-debug-table">
+                        <thead><tr><th>Teste de veículo</th><th>Código</th><th>Placa</th><th>Regional</th><th>Cooperativa</th><th>Situação</th></tr></thead>
+                        <tbody>
+                          {(Array.isArray(directDiagnostic.tests) ? directDiagnostic.tests : []).flatMap((test: any) =>
+                            (Array.isArray(test.vehicles) ? test.vehicles : []).map((item: any, index: number) => (
+                              <tr key={`vehicle-row-${test.id}-${index}`}>
+                                <td>{test.label}</td>
+                                <td>{item.codigo_veiculo || "—"}</td>
+                                <td>{item.placa || "—"}</td>
+                                <td>{item.codigo_regional || "—"}</td>
+                                <td>{item.codigo_cooperativa || "—"}</td>
+                                <td>{item.situacao || "—"}</td>
+                              </tr>
+                            ))
+                          )}
+                        </tbody>
+                      </table>
                     </div>
                   )}
-                  {Array.isArray(protocolDiagnostic.events) && protocolDiagnostic.events.length > 0 ? protocolDiagnostic.events.map((item: any, index: number) => (
-                    <span key={`protocol-${item.codigo_evento || index}`}>
-                      <b>Evento:</b> {item.codigo_evento || "—"} • <b>Protocolo:</b> {item.protocolo || "—"} • <b>Placa:</b> {item.placa || "—"} • <b>Veículo:</b> {item.codigo_veiculo || "—"} • <b>Situação:</b> {item.situacao_evento || "—"} • <b>Motivo:</b> {item.motivo || "—"} • <b>Cooperativa:</b> {item.cooperativa?.nome || item.cooperativa?.codigo || "—"} • <b>Regional:</b> {item.regional?.nome || item.regional?.codigo || "—"}
-                    </span>
-                  )) : <span><b>Resultado:</b> nenhuma das respostas aceitas devolveu o protocolo informado.</span>}
+
+                  {(Array.isArray(directDiagnostic.tests) ? directDiagnostic.tests : []).some((test: any) => Array.isArray(test.events) && test.events.length > 0) && (
+                    <div className="sga-debug-table-wrap" style={{ marginTop: 8 }}>
+                      <table className="sga-debug-table">
+                        <thead><tr><th>Teste de evento</th><th>Evento</th><th>Protocolo</th><th>Veículo</th><th>Placa</th><th>Situação</th><th>Cadastro</th><th>Regional</th><th>Cooperativa</th></tr></thead>
+                        <tbody>
+                          {(Array.isArray(directDiagnostic.tests) ? directDiagnostic.tests : []).flatMap((test: any) =>
+                            (Array.isArray(test.events) ? test.events : []).map((item: any, index: number) => (
+                              <tr key={`event-row-${test.id}-${item.codigo_evento || index}-${index}`} className={item.placa && item.placa.toUpperCase().replace(/[^A-Z0-9]/g, "") === directDiagnostic.targetPlate ? "debug-hit" : ""}>
+                                <td>{test.label}</td>
+                                <td>{item.codigo_evento || "—"}</td>
+                                <td>{item.protocolo || "—"}</td>
+                                <td>{item.codigo_veiculo || "—"}</td>
+                                <td>{item.placa || "—"}</td>
+                                <td>{item.situacao_evento || "—"}</td>
+                                <td>{item.data_cadastro || "—"}</td>
+                                <td>{item.regional || "—"}</td>
+                                <td>{item.cooperativa || "—"}</td>
+                              </tr>
+                            ))
+                          )}
+                        </tbody>
+                      </table>
+                    </div>
+                  )}
+
+                  <span><b>Conclusão automática:</b> {directDiagnostic.eventVisibleAnywhere
+                    ? `a placa ${directDiagnostic.targetPlate} apareceu em pelo menos uma chamada direta (${(directDiagnostic.eventVisibleIn || []).join("; ")}).`
+                    : `nenhuma das chamadas documentadas devolveu evento com a placa exata ${directDiagnostic.targetPlate}.`}</span>
                 </>
               )}
             </div>
@@ -329,7 +377,7 @@ export default function SGAPage() {
 
         {eventResolution?.developerDebug && (
           <details className="sga-debug-panel" open>
-            <summary>Diagnóstico técnico V1.39.20 — somente Desenvolvedor</summary>
+            <summary>Diagnóstico técnico V1.39.21 — somente Desenvolvedor</summary>
             <div className="sga-debug-summary">
               <span>Placa alvo <strong>{eventResolution.developerDebug.targetPlate || plate}</strong></span>
               <span>Veículo alvo <strong>{eventResolution.developerDebug.targetVehicleCode || "—"}</strong></span>
