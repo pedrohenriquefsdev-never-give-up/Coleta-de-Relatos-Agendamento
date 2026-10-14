@@ -56,16 +56,79 @@ export default function SGAPage() {
     setError("");
     setEventResult(null);
     setEventResolution(null);
+
+    const mergeResolution = (previous: any, current: any, chunk: number) => {
+      if (!previous) {
+        return {
+          ...current,
+          searchChunks: chunk,
+          developerDebug: current?.developerDebug ? {
+            ...current.developerDebug,
+            chunks: chunk,
+          } : null,
+        };
+      }
+      const previousDebug = previous?.developerDebug;
+      const currentDebug = current?.developerDebug;
+      return {
+        ...previous,
+        ...current,
+        trace: [...(Array.isArray(previous?.trace) ? previous.trace : []), ...(Array.isArray(current?.trace) ? current.trace : [])].slice(-120),
+        windowsSearched: Number(previous?.windowsSearched || 0) + Number(current?.windowsSearched || 0),
+        searchChunks: chunk,
+        developerDebug: previousDebug || currentDebug ? {
+          ...(previousDebug || {}),
+          ...(currentDebug || {}),
+          pages: [...(Array.isArray(previousDebug?.pages) ? previousDebug.pages : []), ...(Array.isArray(currentDebug?.pages) ? currentDebug.pages : [])].slice(-120),
+          attempts: [...(Array.isArray(previousDebug?.attempts) ? previousDebug.attempts : []), ...(Array.isArray(currentDebug?.attempts) ? currentDebug.attempts : [])].slice(-160),
+          requestCount: Number(previousDebug?.requestCount || 0) + Number(currentDebug?.requestCount || 0),
+          elapsedMs: Number(previousDebug?.elapsedMs || 0) + Number(currentDebug?.elapsedMs || 0),
+          chunks: chunk,
+        } : null,
+      };
+    };
+
     try {
       const t = await token();
-      const res = await fetch(`/api/sga/event?plate=${encodeURIComponent(cleaned)}&referenceDate=${encodeURIComponent(localReferenceDate())}&t=${Date.now()}`, {
-        headers: { Authorization: `Bearer ${t}` },
-        cache: "no-store",
-      });
-      const data = await res.json().catch(() => ({}));
-      setEventResolution(data.resolution || null);
-      if (!res.ok) throw new Error(`${data.error || "Falha ao consultar o SGA."}${data.technical && data.technical !== data.error ? ` — ${data.technical}` : ""}`);
-      setEventResult(data.data);
+      const referenceDate = localReferenceDate();
+      let cursorEnd = "";
+      let combinedResolution: any = null;
+
+      // O usuário clica uma única vez. Se o histórico for antigo, o navegador
+      // continua a busca em blocos curtos para não estourar o tempo da Vercel.
+      for (let chunk = 1; chunk <= 40; chunk += 1) {
+        const params = new URLSearchParams({
+          plate: cleaned,
+          referenceDate,
+          t: String(Date.now()),
+        });
+        if (cursorEnd) params.set("cursorEnd", cursorEnd);
+
+        const res = await fetch(`/api/sga/event?${params.toString()}`, {
+          headers: { Authorization: `Bearer ${t}` },
+          cache: "no-store",
+        });
+        const data = await res.json().catch(() => ({}));
+        combinedResolution = mergeResolution(combinedResolution, data.resolution || null, chunk);
+        setEventResolution(combinedResolution);
+
+        if (!res.ok) {
+          throw new Error(`${data.error || "Falha ao consultar o SGA."}${data.technical && data.technical !== data.error ? ` — ${data.technical}` : ""}`);
+        }
+
+        if (!data.pending) {
+          setEventResult(data.data);
+          return;
+        }
+
+        const nextCursor = String(data?.resolution?.nextCursorDate || "").trim();
+        if (!nextCursor || nextCursor === cursorEnd) {
+          throw new Error("A busca histórica foi interrompida porque o SGA não informou um próximo período válido.");
+        }
+        cursorEnd = nextCursor;
+      }
+
+      throw new Error("A busca histórica atingiu o limite de segurança do Portal. Consulte o diagnóstico técnico.");
     } catch (e) {
       setError(e instanceof Error ? e.message : "Falha ao consultar o SGA.");
     } finally {
@@ -168,9 +231,18 @@ export default function SGAPage() {
           </div>
         )}
 
+        {eventResolution?.failure && (
+          <div className="info-note sga-resolution-note">
+            <strong>Falha técnica capturada:</strong> {eventResolution.failure.stage || "etapa não identificada"}
+            {eventResolution.failure.endpoint ? ` • ${eventResolution.failure.endpoint}` : ""}
+            {eventResolution.failure.status ? ` • HTTP ${eventResolution.failure.status}` : ""}
+            {eventResolution.failure.message ? ` • ${eventResolution.failure.message}` : ""}
+          </div>
+        )}
+
         {eventResolution?.developerDebug && (
           <details className="sga-debug-panel" open>
-            <summary>Diagnóstico técnico V1.39.15 — somente Desenvolvedor</summary>
+            <summary>Diagnóstico técnico V1.39.16 — somente Desenvolvedor</summary>
             <div className="sga-debug-summary">
               <span>Placa alvo <strong>{eventResolution.developerDebug.targetPlate || plate}</strong></span>
               <span>Veículo alvo <strong>{eventResolution.developerDebug.targetVehicleCode || "—"}</strong></span>
@@ -178,6 +250,10 @@ export default function SGAPage() {
               <span>Janela efetiva <strong>{eventResolution.developerDebug.effectiveWindowDays ? `${eventResolution.developerDebug.effectiveWindowDays} dia(s)` : "—"}</strong></span>
               <span>Páginas capturadas <strong>{Array.isArray(eventResolution.developerDebug.pages) ? eventResolution.developerDebug.pages.length : 0}</strong></span>
               <span>Falhas capturadas <strong>{Array.isArray(eventResolution.developerDebug.attempts) ? eventResolution.developerDebug.attempts.filter((item: any) => !item.ok).length : 0}</strong></span>
+              <span>Blocos automáticos <strong>{eventResolution.developerDebug.chunks || eventResolution.searchChunks || 1}</strong></span>
+              <span>Chamadas SGA <strong>{eventResolution.developerDebug.requestCount || 0}</strong></span>
+              <span>Tempo acumulado <strong>{eventResolution.developerDebug.elapsedMs ? `${(eventResolution.developerDebug.elapsedMs / 1000).toFixed(1)}s` : "—"}</strong></span>
+              <span>Última parada <strong>{eventResolution.developerDebug.stoppedReason || "—"}</strong></span>
             </div>
 
             {Array.isArray(eventResolution.developerDebug.attempts) && eventResolution.developerDebug.attempts.some((item: any) => !item.ok) && (

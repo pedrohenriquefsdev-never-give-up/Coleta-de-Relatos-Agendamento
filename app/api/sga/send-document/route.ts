@@ -3,7 +3,7 @@ import { FieldValue } from "firebase-admin/firestore";
 import { adminDb } from "@/lib/firebase-admin";
 import { requireUser, isDeveloper } from "@/lib/server-auth";
 import { safeServerError } from "@/lib/server-error";
-import { listSgaPhotoTypes, normalizeSgaPlate, resolveSgaEventsByPlate, uploadSgaEventDocument } from "@/lib/sga-client";
+import { listSgaEventByProtocol, listSgaPhotoTypes, normalizeSgaPlate, resolveSgaEventsByPlate, uploadSgaEventDocument } from "@/lib/sga-client";
 import { loadCallHistoryData } from "@/lib/call-history-data";
 import { buildCallHistoryPdf } from "@/lib/call-history-pdf";
 
@@ -40,6 +40,7 @@ export async function POST(req: NextRequest) {
     const eventCode = String(body.eventCode || "").trim();
     const vehicleCode = String(body.vehicleCode || "").trim();
     const photoTypeCode = String(body.photoTypeCode || "").trim();
+    const eventProtocol = String(body.eventProtocol || "").trim();
     const observation = String(body.observation || "").trim().slice(0, 4000);
     const referenceDate = String(body.referenceDate || "").trim();
 
@@ -58,9 +59,23 @@ export async function POST(req: NextRequest) {
     const plate = String(report.appointment.plate || "").toUpperCase().replace(/[^A-Z0-9]/g, "");
     if (!plate) return Response.json({ error: "O agendamento não possui uma placa válida." }, { status: 400 });
 
-    const resolvedEvents = await resolveSgaEventsByPlate(plate, { referenceDate });
-    const events = eventArray(resolvedEvents.data);
-    const selectedEvent = events.find((item) => String(item?.codigo_evento ?? "") === eventCode && String(item?.codigo_veiculo ?? item?.veiculo?.codigo ?? "") === vehicleCode);
+    // O Portal já conhece o protocolo do evento escolhido. Quando disponível,
+    // revalidamos diretamente pelo protocolo no SGA — sem pedir nada ao usuário
+    // e sem repetir uma varredura histórica extensa antes do upload.
+    let resolvedBy = "protocol_exact";
+    let events: any[] = [];
+    if (eventProtocol) {
+      const protocolData = await listSgaEventByProtocol(eventProtocol);
+      events = eventArray(protocolData);
+    } else {
+      const resolvedEvents = await resolveSgaEventsByPlate(plate, { referenceDate });
+      if ((resolvedEvents as any).pending) {
+        return Response.json({ error: "A validação histórica do evento ainda não foi concluída. Atualize os eventos do SGA e tente novamente." }, { status: 409 });
+      }
+      resolvedBy = resolvedEvents.resolvedBy;
+      events = eventArray(resolvedEvents.data);
+    }
+    const selectedEvent = events.find((item) => String(item?.codigo_evento ?? item?.codigo ?? "") === eventCode && String(item?.codigo_veiculo ?? item?.veiculo?.codigo ?? "") === vehicleCode);
     const selectedEventPlate = normalizeSgaPlate(selectedEvent?.placa ?? selectedEvent?.veiculo?.placa);
     const selectedEventVehicleCode = String(selectedEvent?.codigo_veiculo ?? selectedEvent?.veiculo?.codigo ?? "").trim();
     const eventStillMatchesPlate = Boolean(
@@ -151,8 +166,8 @@ export async function POST(req: NextRequest) {
         photoTypeName: uploadMeta.photoTypeName,
         filename,
         attemptCount: report.attempts.length,
-        eventLookupResolvedBy: resolvedEvents.resolvedBy,
-        resolvedVehicleCode: resolvedEvents.vehicleCode || "",
+        eventLookupResolvedBy: resolvedBy,
+        resolvedVehicleCode: vehicleCode,
       },
       createdAt: FieldValue.serverTimestamp(),
     });

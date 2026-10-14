@@ -267,6 +267,30 @@ export default function AppointmentModal({
     }
   }
 
+  async function fetchSgaEventsAutomatically(token: string, plate: string) {
+    const referenceDate = localReferenceDate();
+    let cursorEnd = "";
+    for (let chunk = 1; chunk <= 40; chunk += 1) {
+      const params = new URLSearchParams({
+        plate,
+        referenceDate,
+        t: String(Date.now()),
+      });
+      if (cursorEnd) params.set("cursorEnd", cursorEnd);
+      const response = await fetch(`/api/sga/event?${params.toString()}`, {
+        headers: { Authorization: `Bearer ${token}` },
+        cache: "no-store",
+      });
+      const data = await response.json().catch(() => ({}));
+      if (!response.ok) throw new Error(`${data.error || "Não foi possível localizar o evento no SGA."}${data.technical ? ` — ${data.technical}` : ""}`);
+      if (!data.pending) return data;
+      const nextCursor = String(data?.resolution?.nextCursorDate || "").trim();
+      if (!nextCursor || nextCursor === cursorEnd) throw new Error("A busca histórica do SGA não informou um próximo período válido.");
+      cursorEnd = nextCursor;
+    }
+    throw new Error("A busca histórica do SGA atingiu o limite de segurança do Portal.");
+  }
+
   async function loadSgaContext() {
     if (!initial || !user) return;
     setSgaLoading(true);
@@ -276,20 +300,15 @@ export default function AppointmentModal({
     try {
       const token = await getToken();
       const plate = cleanPlate(initial.plate || form.plate);
-      const [eventResponse, catalogResponse] = await Promise.all([
-        fetch(`/api/sga/event?plate=${encodeURIComponent(plate)}&referenceDate=${encodeURIComponent(localReferenceDate())}&t=${Date.now()}`, {
-          headers: { Authorization: `Bearer ${token}` },
-          cache: "no-store",
-        }),
+      const [eventData, catalogResponse] = await Promise.all([
+        fetchSgaEventsAutomatically(token, plate),
         fetch(`/api/sga/catalogs?t=${Date.now()}`, {
           headers: { Authorization: `Bearer ${token}` },
           cache: "no-store",
         }),
       ]);
 
-      const eventData = await eventResponse.json().catch(() => ({}));
       const catalogData = await catalogResponse.json().catch(() => ({}));
-      if (!eventResponse.ok) throw new Error(`${eventData.error || "Não foi possível localizar o evento no SGA."}${eventData.technical ? ` — ${eventData.technical}` : ""}`);
       if (!catalogResponse.ok) throw new Error(catalogData.error || "Não foi possível carregar as classificações do SGA.");
 
       const events = Array.isArray(eventData.data?.eventos) ? eventData.data.eventos as SgaEvent[] : [];
@@ -364,6 +383,7 @@ export default function AppointmentModal({
           eventCode: event.codigo_evento,
           vehicleCode: event.codigo_veiculo,
           photoTypeCode: selectedSgaPhotoType,
+          eventProtocol: event.protocolo || "",
           observation: form.sgaObservation,
           referenceDate: localReferenceDate(),
         }),

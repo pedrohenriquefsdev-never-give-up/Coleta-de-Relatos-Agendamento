@@ -1,0 +1,1 @@
+V1.39.16 - busca histórica segmentada automática, orçamento por requisição, diagnóstico de etapa/endpoint e revalidação por protocolo conhecido pelo Portal.

@@ -92,10 +92,12 @@ export function normalizeSgaPlate(value: unknown) {
   return String(value || "").toUpperCase().replace(/[^A-Z0-9]/g, "").slice(0, 7);
 }
 
-export async function listSgaEventsByVehicle(plateOrCode: string | number) {
+export async function listSgaEventsByVehicle(plateOrCode: string | number, timeoutMs = 8000) {
   const lookup = String(plateOrCode || "").trim();
   if (!lookup) throw new Error("SGA_EVENT_LOOKUP_EMPTY");
-  return sgaFetch(`listar/evento-veiculo/${encodeURIComponent(lookup)}`);
+  return sgaFetch(`listar/evento-veiculo/${encodeURIComponent(lookup)}`, {
+    signal: AbortSignal.timeout(timeoutMs),
+  });
 }
 
 function asArray(value: any): any[] {
@@ -199,11 +201,22 @@ function laterDate(a: Date, b: Date) {
   return a.getTime() >= b.getTime() ? a : b;
 }
 
+export async function listSgaEventByProtocol(protocol: string | number, timeoutMs = 8000) {
+  const value = String(protocol || "").trim();
+  if (!value) throw new Error("SGA_EVENT_PROTOCOL_EMPTY");
+  return sgaFetch("listar/evento", {
+    method: "POST",
+    body: JSON.stringify({ protocolo: value, inicio_paginacao: 0, quantidade_por_pagina: 10 }),
+    signal: AbortSignal.timeout(timeoutMs),
+  });
+}
+
 export async function listSgaEventsByDateRange(
   startDate: Date,
   endDate: Date,
   page = 0,
   pageSize = 100,
+  timeoutMs = 7000,
 ) {
   return sgaFetch("listar/evento", {
     method: "POST",
@@ -213,6 +226,7 @@ export async function listSgaEventsByDateRange(
       inicio_paginacao: page,
       quantidade_por_pagina: pageSize,
     }),
+    signal: AbortSignal.timeout(timeoutMs),
   });
 }
 
@@ -295,6 +309,10 @@ type SgaGeneralListDebug = {
   pages: SgaGeneralListDebugPage[];
   attempts: SgaGeneralListDebugAttempt[];
   capped: boolean;
+  requestCount?: number;
+  elapsedMs?: number;
+  stoppedReason?: string | null;
+  nextCursorDate?: string | null;
 };
 
 function safeNumber(value: unknown) {
@@ -499,39 +517,70 @@ async function lookupEventsInGeneralList(
   trace: SgaResolutionTrace[],
   exactVehicle: any,
   referenceDateInput?: unknown,
+  cursorEndInput?: unknown,
 ) {
-  // A data vem preferencialmente do navegador do usuário. Isso evita depender
-  // do relógio/data do runtime da Vercel para montar as janelas históricas.
+  const startedAt = Date.now();
   const referenceDate = resolveReferenceDate(referenceDateInput);
   const rawContractDate = exactVehicle?.data_contrato ?? exactVehicle?.data_cadastro ?? exactVehicle?.data_reativacao ?? "";
   const parsedContractDate = parseSgaDate(rawContractDate);
 
-  // O evento não pode ser anterior à existência do veículo no SGA. Quando a API
-  // não trouxer nenhuma data utilizável, usamos uma margem ampla de 20 anos.
+  // A busca histórica só é executada quando o veículo exato foi localizado.
+  // Isso evita uma varredura extensa sem um veículo confiável para validação.
+  if (!exactVehicle) {
+    return {
+      data: null,
+      vehicleCode: "",
+      resolvedBy: "",
+      referenceDate: formatIsoDate(referenceDate),
+      vehicleContractDate: null,
+      windowsSearched: 0,
+      pending: false,
+      nextCursorDate: null,
+      generalDebug: {
+        targetPlate: normalizedPlate,
+        targetVehicleCode: "",
+        requestedPageSizes: [25, 10],
+        requestedWindowDays: [30, 15, 7, 1],
+        effectivePageSize: null,
+        effectiveWindowDays: null,
+        pages: [],
+        attempts: [],
+        capped: false,
+        requestCount: 0,
+        elapsedMs: Date.now() - startedAt,
+        stoppedReason: "vehicle_not_resolved",
+        nextCursorDate: null,
+      } satisfies SgaGeneralListDebug,
+    };
+  }
+
   const fallbackLowerBound = addDays(referenceDate, -(366 * 20));
   const lowerBound = parsedContractDate && parsedContractDate.getTime() <= referenceDate.getTime()
     ? parsedContractDate
     : fallbackLowerBound;
 
+  let cursorEnd = cursorEndInput ? resolveReferenceDate(cursorEndInput) : referenceDate;
+  if (cursorEnd.getTime() > referenceDate.getTime()) cursorEnd = referenceDate;
+  if (cursorEnd.getTime() < lowerBound.getTime()) cursorEnd = lowerBound;
+
   trace.push({
     step: "event_general_list_reference",
-    lookup: formatSgaDate(referenceDate),
+    lookup: formatSgaDate(cursorEnd),
     ok: true,
     message: parsedContractDate
-      ? `Busca histórica até a data de contrato/cadastro do veículo: ${formatSgaDate(lowerBound)}.`
+      ? `Busca segmentada até a data de contrato/cadastro do veículo: ${formatSgaDate(lowerBound)}.`
       : `O SGA não informou data de contrato/cadastro utilizável; aplicada margem histórica de segurança.`,
   });
 
-  // V1.39.15: o SGA provou aceitar o mesmo endpoint com quantidade pequena no
-  // teste de conexão, mas recusou a busca histórica usando 500 registros. A
-  // estratégia agora começa no limite documentado de 100 e reduz tanto a
-  // paginação quanto a janela de datas somente quando o provedor rejeitar a
-  // requisição. O operador não precisa informar nenhum parâmetro.
-  const pageSizeCandidates = [100, 50, 25, 10];
+  // V1.39.16: cada requisição do Portal faz apenas um bloco curto de busca.
+  // O navegador continua automaticamente pelo próximo bloco, evitando timeout
+  // do backend e mantendo suporte a eventos antigos sem exigir ação do usuário.
+  const pageSizeCandidates = [25, 10];
   const windowDayCandidates = [30, 15, 7, 1];
-  const hardPageSafetyLimit = 250;
-  const hardDebugPageLimit = 180;
-  const hardDebugAttemptLimit = 220;
+  const maxCompletedWindowsPerChunk = 3;
+  const maxRequestsPerChunk = 18;
+  const maxChunkMs = 12000;
+  const hardPagesPerWindow = 12;
   const generalDebug: SgaGeneralListDebug = {
     targetPlate: normalizedPlate,
     targetVehicleCode: vehicleCodeOf(exactVehicle),
@@ -542,63 +591,57 @@ async function lookupEventsInGeneralList(
     pages: [],
     attempts: [],
     capped: false,
+    requestCount: 0,
+    elapsedMs: 0,
+    stoppedReason: null,
+    nextCursorDate: null,
   };
 
-  function addAttempt(item: SgaGeneralListDebugAttempt) {
-    if (generalDebug.attempts.length < hardDebugAttemptLimit) generalDebug.attempts.push(item);
+  const addAttempt = (item: SgaGeneralListDebugAttempt) => {
+    if (generalDebug.attempts.length < 80) generalDebug.attempts.push(item);
     else generalDebug.capped = true;
-  }
-
-  function addDebugPage(item: SgaGeneralListDebugPage) {
-    if (generalDebug.pages.length < hardDebugPageLimit) generalDebug.pages.push(item);
+  };
+  const addDebugPage = (item: SgaGeneralListDebugPage) => {
+    if (generalDebug.pages.length < 60) generalDebug.pages.push(item);
     else generalDebug.capped = true;
-  }
+  };
+  const budgetExhausted = () =>
+    Number(generalDebug.requestCount || 0) >= maxRequestsPerChunk || Date.now() - startedAt >= maxChunkMs;
 
-  let preferredWindowDays: number | null = null;
-  let preferredPageSize: number | null = null;
-  let cursorEnd = referenceDate;
   let windowsSearched = 0;
-  let consecutiveUnqueryableDays = 0;
+  let preferredPageSize = 25;
+  let preferredWindowDays = 30;
 
-  while (cursorEnd.getTime() >= lowerBound.getTime()) {
-    // Depois que uma combinação funciona, ela vira a primeira opção nas janelas
-    // seguintes. Se falhar mais adiante, os fallbacks continuam disponíveis.
-    const windowCandidates: number[] = preferredWindowDays !== null
-      ? [preferredWindowDays, ...windowDayCandidates.filter((value: number) => value !== preferredWindowDays)]
-      : [...windowDayCandidates];
+  while (cursorEnd.getTime() >= lowerBound.getTime() && windowsSearched < maxCompletedWindowsPerChunk) {
+    if (budgetExhausted()) break;
 
-    let completedWindow: {
-      start: Date;
-      end: Date;
-      label: string;
-      windowDays: number;
-      pageSize: number;
-      matches: any[];
-    } | null = null;
+    const windowCandidates = [preferredWindowDays, ...windowDayCandidates.filter((v) => v !== preferredWindowDays)];
+    let completedWindow: { start: Date; end: Date; matches: any[]; pageSize: number; windowDays: number } | null = null;
 
     for (const requestedWindowDays of windowCandidates) {
+      if (budgetExhausted()) break;
       const naturalStart = addDays(cursorEnd, -(requestedWindowDays - 1));
       const start = laterDate(naturalStart, lowerBound);
       const end = cursorEnd;
       const actualWindowDays = Math.max(1, Math.round((end.getTime() - start.getTime()) / 86400000) + 1);
       const label = `${formatSgaDate(start)}–${formatSgaDate(end)}`;
-      const pageCandidates: number[] = preferredPageSize !== null
-        ? [preferredPageSize, ...pageSizeCandidates.filter((value: number) => value !== preferredPageSize)]
-        : [...pageSizeCandidates];
+      const pageCandidates = [preferredPageSize, ...pageSizeCandidates.filter((v) => v !== preferredPageSize)];
 
       for (const pageSize of pageCandidates) {
-        const matchesInAttempt: any[] = [];
-        let page = 0;
-        let attemptFailed = false;
-        let firstFailure: any = null;
+        if (budgetExhausted()) break;
+        const matches: any[] = [];
+        let failed = false;
+        let completed = false;
 
-        while (page < hardPageSafetyLimit) {
+        for (let page = 0; page < hardPagesPerWindow; page += 1) {
+          if (budgetExhausted()) break;
           try {
-            const data = await listSgaEventsByDateRange(start, end, page, pageSize);
+            generalDebug.requestCount = Number(generalDebug.requestCount || 0) + 1;
+            const data = await listSgaEventsByDateRange(start, end, page, pageSize, 6000);
             const rawEvents = eventsFrom(data);
             const normalizedEvents = rawEvents.map(normalizeSgaEvent);
             const exactMatches = normalizedEvents.filter((event) => eventPlateOf(event) === normalizedPlate);
-            matchesInAttempt.push(...exactMatches);
+            matches.push(...exactMatches);
 
             addAttempt({
               window: label,
@@ -608,38 +651,46 @@ async function lookupEventsInGeneralList(
               ok: true,
               message: `${rawEvents.length} evento(s) retornado(s).`,
             });
-            addDebugPage(makeGeneralDebugPage(
-              data,
-              rawEvents,
-              normalizedPlate,
-              generalDebug.targetVehicleCode,
-              label,
-              actualWindowDays,
-              pageSize,
-              page,
-            ));
-
-            const totalPagesRaw = data?.paginacao?.numero_paginas ?? data?.paginacao?.total_paginas;
-            const totalPages = Number(totalPagesRaw);
-            const hasKnownTotalPages = Number.isFinite(totalPages) && totalPages > 0;
+            addDebugPage(makeGeneralDebugPage(data, rawEvents, normalizedPlate, generalDebug.targetVehicleCode, label, actualWindowDays, pageSize, page));
 
             trace.push({
               step: "event_general_list_exact_plate",
               lookup: `${label} / página ${page + 1} / ${pageSize} registros`,
               ok: exactMatches.length > 0,
               message: exactMatches.length > 0
-                ? `${exactMatches.length} evento(s) da placa ${normalizedPlate} localizado(s) nesta página.`
+                ? `${exactMatches.length} evento(s) da placa ${normalizedPlate} localizado(s).`
                 : `${rawEvents.length} evento(s) analisado(s); nenhum pertence à placa ${normalizedPlate}.`,
               returnedPlates: exactMatches.length > 0 ? [normalizedPlate] : [],
             });
 
-            if (rawEvents.length === 0) break;
-            if (hasKnownTotalPages && page + 1 >= totalPages) break;
-            if (!hasKnownTotalPages && rawEvents.length < pageSize) break;
-            page += 1;
+            // Encontrou a placa: não precisamos continuar paginando nem varrendo histórico.
+            if (matches.length > 0) {
+              generalDebug.effectivePageSize = pageSize;
+              generalDebug.effectiveWindowDays = actualWindowDays;
+              generalDebug.elapsedMs = Date.now() - startedAt;
+              const found = dedupeEvents(matches).sort((a, b) => eventSortValue(b) - eventSortValue(a));
+              return {
+                data: { eventos: found },
+                vehicleCode: eventVehicleCodeOf(found[0]),
+                resolvedBy: "event_list_exact_plate",
+                referenceDate: formatIsoDate(referenceDate),
+                vehicleContractDate: parsedContractDate ? formatIsoDate(lowerBound) : null,
+                windowsSearched: windowsSearched + 1,
+                pending: false,
+                nextCursorDate: null,
+                generalDebug,
+              };
+            }
+
+            const totalPagesRaw = data?.paginacao?.numero_paginas ?? data?.paginacao?.total_paginas;
+            const totalPages = Number(totalPagesRaw);
+            const hasKnownTotalPages = Number.isFinite(totalPages) && totalPages > 0;
+            if (rawEvents.length === 0 || (hasKnownTotalPages && page + 1 >= totalPages) || (!hasKnownTotalPages && rawEvents.length < pageSize)) {
+              completed = true;
+              break;
+            }
           } catch (error: any) {
-            attemptFailed = true;
-            firstFailure = error;
+            failed = true;
             const status = error?.status ? Number(error.status) : undefined;
             const message = String(error?.message || error || "Erro desconhecido do SGA.");
             addAttempt({
@@ -652,8 +703,8 @@ async function lookupEventsInGeneralList(
               message,
             });
             trace.push({
-              step: "event_general_list_adaptive_error",
-              lookup: `${label} / página ${page + 1} / ${pageSize} registros`,
+              step: "event_general_list_request_error",
+              lookup: `POST listar/evento • ${label} • página ${page + 1} • ${pageSize} registros`,
               ok: false,
               ...(status ? { status } : {}),
               message,
@@ -662,86 +713,50 @@ async function lookupEventsInGeneralList(
           }
         }
 
-        if (page >= hardPageSafetyLimit) {
-          generalDebug.capped = true;
-          attemptFailed = true;
-          firstFailure = new Error(`Limite de segurança de ${hardPageSafetyLimit} páginas atingido.`);
-          addAttempt({
-            window: label,
-            windowDays: actualWindowDays,
-            pageSize,
-            page: hardPageSafetyLimit,
-            ok: false,
-            message: String(firstFailure.message),
-          });
-        }
-
-        if (!attemptFailed) {
-          preferredWindowDays = requestedWindowDays;
+        if (!failed && completed) {
           preferredPageSize = pageSize;
-          generalDebug.effectiveWindowDays = actualWindowDays;
+          preferredWindowDays = requestedWindowDays;
           generalDebug.effectivePageSize = pageSize;
-          completedWindow = {
-            start,
-            end,
-            label,
-            windowDays: actualWindowDays,
-            pageSize,
-            matches: dedupeEvents(matchesInAttempt).sort((a, b) => eventSortValue(b) - eventSortValue(a)),
-          };
+          generalDebug.effectiveWindowDays = actualWindowDays;
+          completedWindow = { start, end, matches: [], pageSize, windowDays: actualWindowDays };
           break;
         }
 
-        // Não usamos dados parciais de uma tentativa que falhou no meio da
-        // paginação. Reiniciamos a mesma janela com um tamanho menor.
+        if (budgetExhausted()) break;
         trace.push({
-          step: "event_general_list_adaptive_retry",
+          step: "event_general_list_retry",
           lookup: `${label} / ${pageSize} registros`,
           ok: false,
-          ...(firstFailure?.status ? { status: Number(firstFailure.status) } : {}),
-          message: `Tentativa descartada e será refeita automaticamente com parâmetros menores.`,
+          message: `A tentativa falhou ou ficou incompleta; o Portal seguirá automaticamente com parâmetros menores.`,
         });
       }
 
-      if (completedWindow) break;
+      if (completedWindow || budgetExhausted()) break;
     }
 
     if (!completedWindow) {
-      // Se até 1 dia / 10 registros falhar, avançar muitos anos repetindo a
-      // mesma falha seria inútil. Testamos o dia anterior para cobrir diferença
-      // de virada de data e então encerramos com o HTTP real no diagnóstico.
-      consecutiveUnqueryableDays += 1;
+      // Uma falha localizada não derruba toda a consulta. Avançamos um dia para
+      // trás e deixamos a próxima requisição automática continuar desse ponto.
       trace.push({
-        step: "event_general_list_unqueryable",
+        step: "event_general_list_window_unavailable",
         lookup: formatSgaDate(cursorEnd),
         ok: false,
-        message: `O endpoint geral recusou todas as combinações automáticas de janela/paginação para este dia.`,
+        message: `A janela não pôde ser concluída dentro do limite seguro desta requisição.`,
       });
-      if (consecutiveUnqueryableDays >= 2) break;
       cursorEnd = addDays(cursorEnd, -1);
-      continue;
+      break;
     }
 
-    consecutiveUnqueryableDays = 0;
     windowsSearched += 1;
-
-    if (completedWindow.matches.length > 0) {
-      const eventVehicleCode = eventVehicleCodeOf(completedWindow.matches[0]);
-      return {
-        data: { eventos: completedWindow.matches },
-        vehicleCode: eventVehicleCode,
-        resolvedBy: "event_list_exact_plate",
-        referenceDate: formatIsoDate(referenceDate),
-        vehicleContractDate: parsedContractDate ? formatIsoDate(lowerBound) : null,
-        windowsSearched,
-        generalDebug,
-      };
-    }
-
-    // Próxima janela termina no dia imediatamente anterior ao início da atual,
-    // sem sobreposição e sem buracos entre os intervalos que de fato funcionaram.
     cursorEnd = addDays(completedWindow.start, -1);
   }
+
+  const hasMore = cursorEnd.getTime() >= lowerBound.getTime();
+  generalDebug.elapsedMs = Date.now() - startedAt;
+  generalDebug.stoppedReason = hasMore
+    ? (budgetExhausted() ? "safe_request_budget" : "chunk_complete")
+    : "history_exhausted";
+  generalDebug.nextCursorDate = hasMore ? formatIsoDate(cursorEnd) : null;
 
   return {
     data: null,
@@ -750,11 +765,13 @@ async function lookupEventsInGeneralList(
     referenceDate: formatIsoDate(referenceDate),
     vehicleContractDate: parsedContractDate ? formatIsoDate(lowerBound) : null,
     windowsSearched,
+    pending: hasMore,
+    nextCursorDate: hasMore ? formatIsoDate(cursorEnd) : null,
     generalDebug,
   };
 }
 
-export async function resolveSgaEventsByPlate(value: unknown, options: { referenceDate?: unknown } = {}) {
+export async function resolveSgaEventsByPlate(value: unknown, options: { referenceDate?: unknown; cursorEnd?: unknown; skipDirect?: boolean } = {}) {
   const normalizedPlate = normalizeSgaPlate(value);
   if (!normalizedPlate) throw new Error("SGA_PLATE_EMPTY");
 
@@ -763,17 +780,26 @@ export async function resolveSgaEventsByPlate(value: unknown, options: { referen
   let exactVehicle: any = null;
   let vehicleCode = "";
 
-  // 1) Caminho preferencial: localizar SOMENTE um veículo cuja placa seja
-  // exatamente igual à placa solicitada. Nunca usamos o primeiro item retornado.
+  // 1) Sempre resolvemos o veículo exato. É a âncora de segurança da integração.
   const vehicleLookup = await lookupVehicleByPlate(normalizedPlate);
   trace.push(...vehicleLookup.trace);
   exactVehicle = vehicleLookup.vehicle;
   vehicleCode = vehicleCodeOf(exactVehicle);
   if (vehicleLookup.error) lastError = vehicleLookup.error;
 
+  if (!exactVehicle) {
+    const vehicleError: any = new Error(`Nenhum veículo com correspondência exata para a placa ${normalizedPlate} foi localizado no SGA.`);
+    vehicleError.code = "SGA_EXACT_VEHICLE_NOT_FOUND";
+    vehicleError.cause = lastError;
+    vehicleError.trace = trace;
+    vehicleError.normalizedPlate = normalizedPlate;
+    vehicleError.vehicleCode = "";
+    throw vehicleError;
+  }
+
   // 2) Se encontramos o veículo exato, consultamos os eventos pelo código interno
   // e filtramos novamente para impedir qualquer associação cruzada.
-  if (vehicleCode) {
+  if (vehicleCode && !options.skipDirect && !options.cursorEnd) {
     try {
       const data = await listSgaEventsByVehicle(vehicleCode);
       const rawEvents = eventsFrom(data);
@@ -781,7 +807,7 @@ export async function resolveSgaEventsByPlate(value: unknown, options: { referen
 
       trace.push({
         step: "event_by_exact_vehicle_code",
-        lookup: vehicleCode,
+        lookup: `GET listar/evento-veiculo/${vehicleCode}`,
         ok: exactEvents.length > 0,
         message: exactEvents.length > 0
           ? `${exactEvents.length} evento(s) confirmado(s) para ${normalizedPlate}.`
@@ -805,7 +831,7 @@ export async function resolveSgaEventsByPlate(value: unknown, options: { referen
       lastError = error;
       trace.push({
         step: "event_by_exact_vehicle_code",
-        lookup: vehicleCode,
+        lookup: `GET listar/evento-veiculo/${vehicleCode}`,
         ok: false,
         ...(error?.status ? { status: Number(error.status) } : {}),
         message: String(error?.message || error),
@@ -813,16 +839,16 @@ export async function resolveSgaEventsByPlate(value: unknown, options: { referen
     }
   }
 
-  // 3) Fallback controlado: consulta direta pela placa. Mesmo que o SGA responda,
-  // só aceitamos eventos cuja placa retornada seja EXATAMENTE a solicitada.
-  try {
+  // 3) Fallback controlado: consulta direta pela placa. Nas continuações da
+  // busca histórica, pulamos esta etapa para não repetir chamadas já testadas.
+  if (!options.skipDirect && !options.cursorEnd) try {
     const data = await listSgaEventsByVehicle(normalizedPlate);
     const rawEvents = eventsFrom(data);
     const exactEvents = rawEvents.map(normalizeSgaEvent).filter((event) => eventPlateOf(event) === normalizedPlate);
 
     trace.push({
       step: "event_by_exact_plate",
-      lookup: normalizedPlate,
+      lookup: `GET listar/evento-veiculo/${normalizedPlate}`,
       ok: exactEvents.length > 0,
       message: exactEvents.length > 0
         ? `${exactEvents.length} evento(s) confirmado(s) pela placa.`
@@ -847,7 +873,7 @@ export async function resolveSgaEventsByPlate(value: unknown, options: { referen
     lastError = error;
     trace.push({
       step: "event_by_exact_plate",
-      lookup: normalizedPlate,
+      lookup: `GET listar/evento-veiculo/${normalizedPlate}`,
       ok: false,
       ...(error?.status ? { status: Number(error.status) } : {}),
       message: String(error?.message || error),
@@ -857,7 +883,44 @@ export async function resolveSgaEventsByPlate(value: unknown, options: { referen
   // 4) Fallback automático final: consulta a listagem geral de eventos em
   // janelas de 30 dias e filtra SOMENTE a placa exata. Isso evita exigir que o
   // operador abra o SGA para descobrir ou digitar protocolo.
-  const generalLookup = await lookupEventsInGeneralList(normalizedPlate, trace, exactVehicle, options.referenceDate);
+  let generalLookup: any;
+  try {
+    generalLookup = await lookupEventsInGeneralList(normalizedPlate, trace, exactVehicle, options.referenceDate, options.cursorEnd);
+  } catch (error: any) {
+    lastError = error;
+    trace.push({
+      step: "event_general_list_unhandled",
+      lookup: "POST listar/evento",
+      ok: false,
+      ...(error?.status ? { status: Number(error.status) } : {}),
+      message: String(error?.message || error),
+    });
+    generalLookup = {
+      data: null,
+      vehicleCode: "",
+      resolvedBy: "",
+      referenceDate: formatIsoDate(resolveReferenceDate(options.referenceDate)),
+      vehicleContractDate: null,
+      windowsSearched: 0,
+      pending: false,
+      nextCursorDate: null,
+      generalDebug: {
+        targetPlate: normalizedPlate,
+        targetVehicleCode: vehicleCode,
+        requestedPageSizes: [25, 10],
+        requestedWindowDays: [30, 15, 7, 1],
+        effectivePageSize: null,
+        effectiveWindowDays: null,
+        pages: [],
+        attempts: [{ window: "—", windowDays: 0, pageSize: 0, page: 0, ok: false, ...(error?.status ? { status: Number(error.status) } : {}), message: String(error?.message || error) }],
+        capped: false,
+        requestCount: 0,
+        elapsedMs: 0,
+        stoppedReason: "unhandled_error",
+        nextCursorDate: null,
+      },
+    };
+  }
   if (generalLookup.data) {
     return {
       data: generalLookup.data,
@@ -865,6 +928,23 @@ export async function resolveSgaEventsByPlate(value: unknown, options: { referen
       vehicleCode: generalLookup.vehicleCode || vehicleCode,
       vehicle: exactVehicle,
       resolvedBy: generalLookup.resolvedBy,
+      trace,
+      referenceDate: generalLookup.referenceDate,
+      vehicleContractDate: generalLookup.vehicleContractDate,
+      windowsSearched: generalLookup.windowsSearched,
+      generalDebug: generalLookup.generalDebug,
+    };
+  }
+
+  if (generalLookup.pending && generalLookup.nextCursorDate) {
+    return {
+      data: null,
+      pending: true,
+      nextCursorDate: generalLookup.nextCursorDate,
+      normalizedPlate,
+      vehicleCode,
+      vehicle: exactVehicle,
+      resolvedBy: "history_continue",
       trace,
       referenceDate: generalLookup.referenceDate,
       vehicleContractDate: generalLookup.vehicleContractDate,
