@@ -280,3 +280,13 @@ Esta versão não adiciona novas gravações diretas pelo navegador. As informa�
 - Informa separadamente se o protocolo ficou visível para a API e se a placa retornada corresponde exatamente à placa pesquisada.
 - Erros do SGA são exibidos com HTTP/mensagem técnica para separar indisponibilidade do endpoint de ausência do evento no escopo do usuário/token.
 - Nenhuma nova variável de ambiente ou regra de Firestore é necessária.
+
+
+## V1.39.20 — diagnóstico dos formatos de protocolo no SGA
+
+- O teste de Desenvolvedor do protocolo conhecido deixa de depender de uma única forma de payload.
+- Executa três tentativas isoladas no `POST listar/evento`: protocolo como texto sem paginação, protocolo como número sem paginação e protocolo como texto com paginação.
+- Cada tentativa exibe separadamente se foi aceita ou rejeitada, HTTP, corpo enviado, formato do retorno, quantidade de registros, correspondência do protocolo e correspondência exata da placa.
+- Uma rejeição `406` em uma variante não interrompe as demais tentativas.
+- A busca operacional por placa e o envio real ao SGA não são alterados nesta versão; o objetivo é exclusivamente identificar o formato realmente aceito pela API Hinova.
+- Nenhuma nova variável de ambiente ou regra de Firestore é necessária.
