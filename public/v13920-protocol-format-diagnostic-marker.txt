@@ -1,0 +1,1 @@
+V1.39.20 - diagnóstico isolado do POST listar/evento testa protocolo como texto, número e texto com paginação, exibindo HTTP e formato aceito.

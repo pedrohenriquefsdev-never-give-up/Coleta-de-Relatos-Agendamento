@@ -252,7 +252,7 @@ export default function SGAPage() {
         {developer && (
           <div className="sga-debug-panel" style={{ marginTop: 12 }}>
             <div className="sga-debug-structure">
-              <strong>Diagnóstico direto V1.39.19 — protocolo conhecido</strong>
+              <strong>Diagnóstico direto V1.39.20 — protocolo conhecido</strong>
               <span>Teste temporário exclusivo do Desenvolvedor. Ele não muda o fluxo do operador: serve apenas para verificar se a API consegue enxergar diretamente o evento de teste pelo protocolo.</span>
               <div className="sga-search-row">
                 <input
@@ -270,16 +270,33 @@ export default function SGAPage() {
               {protocolDiagnostic && (
                 <>
                   <div className="sga-debug-summary">
+                    <span>Algum formato aceito <strong>{protocolDiagnostic.allRejected ? "NÃO" : "SIM"}</strong></span>
+                    <span>Formato aceito <strong>{protocolDiagnostic.acceptedVariantLabel || "—"}</strong></span>
                     <span>Protocolo visível <strong>{protocolDiagnostic.protocolVisible ? "SIM" : "NÃO"}</strong></span>
                     <span>Placa exata visível <strong>{protocolDiagnostic.exactPlateVisible ? "SIM" : "NÃO"}</strong></span>
-                    <span>Registros retornados <strong>{protocolDiagnostic.rawCount ?? 0}</strong></span>
-                    <span>Correspondências do protocolo <strong>{protocolDiagnostic.protocolMatchCount ?? 0}</strong></span>
                   </div>
+                  {Array.isArray(protocolDiagnostic.attempts) && protocolDiagnostic.attempts.length > 0 && (
+                    <div className="sga-debug-structure" style={{ marginTop: 8 }}>
+                      <strong>Tentativas isoladas em POST listar/evento</strong>
+                      {protocolDiagnostic.attempts.map((attempt: any, index: number) => (
+                        <span key={`protocol-attempt-${attempt.id || index}`}>
+                          <b>{index + 1}. {attempt.label || attempt.id || "Tentativa"}</b> • {attempt.accepted ? "ACEITA" : "REJEITADA"}
+                          {attempt.status ? ` • HTTP ${attempt.status}` : ""}
+                          {` • Corpo: ${JSON.stringify(attempt.body || {})}`}
+                          {attempt.responseShape ? ` • Retorno: ${attempt.responseShape}` : ""}
+                          {` • Registros: ${attempt.rawCount ?? 0}`}
+                          {` • Protocolo: ${attempt.protocolMatchCount ?? 0}`}
+                          {` • Placa exata: ${attempt.exactPlateMatchCount ?? 0}`}
+                          {attempt.message ? ` • ${attempt.message}` : ""}
+                        </span>
+                      ))}
+                    </div>
+                  )}
                   {Array.isArray(protocolDiagnostic.events) && protocolDiagnostic.events.length > 0 ? protocolDiagnostic.events.map((item: any, index: number) => (
                     <span key={`protocol-${item.codigo_evento || index}`}>
                       <b>Evento:</b> {item.codigo_evento || "—"} • <b>Protocolo:</b> {item.protocolo || "—"} • <b>Placa:</b> {item.placa || "—"} • <b>Veículo:</b> {item.codigo_veiculo || "—"} • <b>Situação:</b> {item.situacao_evento || "—"} • <b>Motivo:</b> {item.motivo || "—"} • <b>Cooperativa:</b> {item.cooperativa?.nome || item.cooperativa?.codigo || "—"} • <b>Regional:</b> {item.regional?.nome || item.regional?.codigo || "—"}
                     </span>
-                  )) : <span><b>Resultado:</b> o SGA respondeu, mas não devolveu o protocolo informado para este usuário/token da API.</span>}
+                  )) : <span><b>Resultado:</b> nenhuma das respostas aceitas devolveu o protocolo informado.</span>}
                 </>
               )}
             </div>
@@ -312,7 +329,7 @@ export default function SGAPage() {
 
         {eventResolution?.developerDebug && (
           <details className="sga-debug-panel" open>
-            <summary>Diagnóstico técnico V1.39.19 — somente Desenvolvedor</summary>
+            <summary>Diagnóstico técnico V1.39.20 — somente Desenvolvedor</summary>
             <div className="sga-debug-summary">
               <span>Placa alvo <strong>{eventResolution.developerDebug.targetPlate || plate}</strong></span>
               <span>Veículo alvo <strong>{eventResolution.developerDebug.targetVehicleCode || "—"}</strong></span>
