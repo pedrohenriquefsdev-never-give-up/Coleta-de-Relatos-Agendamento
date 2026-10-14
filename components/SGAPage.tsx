@@ -5,6 +5,12 @@ import { useState } from "react";
 import { useSession } from "./AuthGate";
 import Plate from "./Plate";
 
+
+function localReferenceDate() {
+  const now = new Date();
+  return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}-${String(now.getDate()).padStart(2, "0")}`;
+}
+
 function asArray(value: any): any[] {
   if (Array.isArray(value)) return value;
   if (value == null) return [];
@@ -52,7 +58,7 @@ export default function SGAPage() {
     setEventResolution(null);
     try {
       const t = await token();
-      const res = await fetch(`/api/sga/event?plate=${encodeURIComponent(cleaned)}&t=${Date.now()}`, {
+      const res = await fetch(`/api/sga/event?plate=${encodeURIComponent(cleaned)}&referenceDate=${encodeURIComponent(localReferenceDate())}&t=${Date.now()}`, {
         headers: { Authorization: `Bearer ${t}` },
         cache: "no-store",
       });
@@ -151,6 +157,9 @@ export default function SGAPage() {
           <div className="info-note sga-resolution-note">
             Placa normalizada: <strong>{eventResolution.normalizedPlate || plate}</strong>
             {eventResolution.vehicleCode ? <> • veículo SGA <strong>{eventResolution.vehicleCode}</strong></> : null}
+            {eventResolution.referenceDate ? <> • referência <strong>{eventResolution.referenceDate.split("-").reverse().join("/")}</strong></> : null}
+            {eventResolution.vehicleContractDate ? <> • contrato <strong>{eventResolution.vehicleContractDate.split("-").reverse().join("/")}</strong></> : null}
+            {eventResolution.windowsSearched ? <> • <strong>{eventResolution.windowsSearched}</strong> janela(s) pesquisada(s)</> : null}
             {eventResolution.resolvedBy === "vehicle_code_exact"
               ? " • evento confirmado pelo código do veículo"
               : eventResolution.resolvedBy === "event_list_exact_plate"

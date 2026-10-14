@@ -41,6 +41,7 @@ export async function POST(req: NextRequest) {
     const vehicleCode = String(body.vehicleCode || "").trim();
     const photoTypeCode = String(body.photoTypeCode || "").trim();
     const observation = String(body.observation || "").trim().slice(0, 4000);
+    const referenceDate = String(body.referenceDate || "").trim();
 
     if (!appointmentId || !eventCode || !vehicleCode || !photoTypeCode) {
       return Response.json({ error: "Selecione o evento e a classificação do documento antes de enviar." }, { status: 400 });
@@ -57,7 +58,7 @@ export async function POST(req: NextRequest) {
     const plate = String(report.appointment.plate || "").toUpperCase().replace(/[^A-Z0-9]/g, "");
     if (!plate) return Response.json({ error: "O agendamento não possui uma placa válida." }, { status: 400 });
 
-    const resolvedEvents = await resolveSgaEventsByPlate(plate);
+    const resolvedEvents = await resolveSgaEventsByPlate(plate, { referenceDate });
     const events = eventArray(resolvedEvents.data);
     const selectedEvent = events.find((item) => String(item?.codigo_evento ?? "") === eventCode && String(item?.codigo_veiculo ?? item?.veiculo?.codigo ?? "") === vehicleCode);
     const selectedEventPlate = normalizeSgaPlate(selectedEvent?.placa ?? selectedEvent?.veiculo?.placa);

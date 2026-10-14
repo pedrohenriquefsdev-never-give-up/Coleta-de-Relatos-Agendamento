@@ -8,6 +8,11 @@ import Modal from "./Modal";
 import { availableTimesForUser, fitsAvailability } from "@/lib/agenda-availability";
 import type { AgendaAvailability, AppUser, Appointment, AppointmentStatus } from "@/lib/types";
 
+function localReferenceDate() {
+  const now = new Date();
+  return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}-${String(now.getDate()).padStart(2, "0")}`;
+}
+
 const cleanPlate = (v: string) => v.toUpperCase().replace(/[^A-Z0-9]/g, "").slice(0, 7);
 const cleanPhone = (v: string) => v.replace(/\D/g, "").slice(0, 11);
 
@@ -272,7 +277,7 @@ export default function AppointmentModal({
       const token = await getToken();
       const plate = cleanPlate(initial.plate || form.plate);
       const [eventResponse, catalogResponse] = await Promise.all([
-        fetch(`/api/sga/event?plate=${encodeURIComponent(plate)}&t=${Date.now()}`, {
+        fetch(`/api/sga/event?plate=${encodeURIComponent(plate)}&referenceDate=${encodeURIComponent(localReferenceDate())}&t=${Date.now()}`, {
           headers: { Authorization: `Bearer ${token}` },
           cache: "no-store",
         }),
@@ -360,6 +365,7 @@ export default function AppointmentModal({
           vehicleCode: event.codigo_veiculo,
           photoTypeCode: selectedSgaPhotoType,
           observation: form.sgaObservation,
+          referenceDate: localReferenceDate(),
         }),
       });
       const data = await response.json().catch(() => ({}));

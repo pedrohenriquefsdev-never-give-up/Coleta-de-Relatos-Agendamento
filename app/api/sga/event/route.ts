@@ -13,7 +13,8 @@ export async function GET(req: NextRequest) {
     const plate = normalizeSgaPlate(rawPlate);
     if (!plate) return Response.json({ error: "Informe uma placa válida." }, { status: 400 });
 
-    const result = await resolveSgaEventsByPlate(plate);
+    const referenceDate = String(req.nextUrl.searchParams.get("referenceDate") || "").trim();
+    const result = await resolveSgaEventsByPlate(plate, { referenceDate });
     return Response.json({
       ok: true,
       data: result.data,
@@ -23,6 +24,9 @@ export async function GET(req: NextRequest) {
         vehicleCode: result.vehicleCode || null,
         resolvedBy: result.resolvedBy,
         trace: result.trace,
+        referenceDate: result.referenceDate || referenceDate || null,
+        vehicleContractDate: result.vehicleContractDate || null,
+        windowsSearched: result.windowsSearched || 0,
       },
     });
   } catch (e: any) {
@@ -38,6 +42,9 @@ export async function GET(req: NextRequest) {
         normalizedPlate: e?.normalizedPlate || null,
         vehicleCode: e?.vehicleCode || null,
         trace: Array.isArray(e?.trace) ? e.trace : [],
+        referenceDate: e?.referenceDate || null,
+        vehicleContractDate: e?.vehicleContractDate || null,
+        windowsSearched: Number(e?.windowsSearched || 0),
       },
     }, { status });
   }

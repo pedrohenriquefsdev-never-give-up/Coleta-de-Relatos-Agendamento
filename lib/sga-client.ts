@@ -139,22 +139,71 @@ function normalizeSgaEvent(event: any) {
   };
 }
 
+function normalizeDateOnly(date: Date) {
+  return new Date(Date.UTC(date.getUTCFullYear(), date.getUTCMonth(), date.getUTCDate(), 12, 0, 0, 0));
+}
+
 function formatSgaDate(date: Date) {
-  return `${String(date.getDate()).padStart(2, "0")}/${String(date.getMonth() + 1).padStart(2, "0")}/${date.getFullYear()}`;
+  return `${String(date.getUTCDate()).padStart(2, "0")}/${String(date.getUTCMonth() + 1).padStart(2, "0")}/${date.getUTCFullYear()}`;
+}
+
+function formatIsoDate(date: Date) {
+  return `${date.getUTCFullYear()}-${String(date.getUTCMonth() + 1).padStart(2, "0")}-${String(date.getUTCDate()).padStart(2, "0")}`;
+}
+
+function parseSgaDate(value: unknown): Date | null {
+  const raw = String(value || "").trim();
+  if (!raw) return null;
+
+  let year = 0;
+  let month = 0;
+  let day = 0;
+
+  let match = raw.match(/^(\d{4})-(\d{2})-(\d{2})/);
+  if (match) {
+    year = Number(match[1]);
+    month = Number(match[2]);
+    day = Number(match[3]);
+  } else {
+    match = raw.match(/^(\d{2})\/(\d{2})\/(\d{4})/);
+    if (!match) return null;
+    day = Number(match[1]);
+    month = Number(match[2]);
+    year = Number(match[3]);
+  }
+
+  if (!year || month < 1 || month > 12 || day < 1 || day > 31) return null;
+  const parsed = new Date(Date.UTC(year, month - 1, day, 12, 0, 0, 0));
+  if (
+    parsed.getUTCFullYear() !== year ||
+    parsed.getUTCMonth() !== month - 1 ||
+    parsed.getUTCDate() !== day
+  ) return null;
+  return parsed;
+}
+
+function resolveReferenceDate(value?: unknown) {
+  if (value instanceof Date && !Number.isNaN(value.getTime())) return normalizeDateOnly(value);
+  const parsed = parseSgaDate(value);
+  if (parsed) return parsed;
+  return normalizeDateOnly(new Date());
 }
 
 function addDays(date: Date, amount: number) {
-  const next = new Date(date);
-  next.setHours(12, 0, 0, 0);
-  next.setDate(next.getDate() + amount);
+  const next = normalizeDateOnly(date);
+  next.setUTCDate(next.getUTCDate() + amount);
   return next;
+}
+
+function laterDate(a: Date, b: Date) {
+  return a.getTime() >= b.getTime() ? a : b;
 }
 
 export async function listSgaEventsByDateRange(
   startDate: Date,
   endDate: Date,
   page = 0,
-  pageSize = 1000,
+  pageSize = 500,
 ) {
   return sgaFetch("listar/evento", {
     method: "POST",
@@ -260,56 +309,91 @@ async function lookupVehicleByPlate(normalizedPlate: string) {
   return { data: null, vehicle: null, trace, error: lastError };
 }
 
-async function lookupEventsInGeneralList(normalizedPlate: string, trace: SgaResolutionTrace[]) {
-  // O endpoint específico "listar/evento-veiculo" apresentou inconsistências em
-  // alguns cadastros. Como fallback, varremos a listagem geral em janelas de no
-  // máximo 30 dias (limite documentado pelo SGA) e filtramos localmente pela
-  // placa EXATA. O operador não precisa informar protocolo.
-  const today = new Date();
-  today.setHours(12, 0, 0, 0);
+function eventSortValue(event: any) {
+  const raw = event?.data_cadastro_evento ?? event?.data_cadastro ?? event?.data_evento ?? "";
+  const parsed = parseSgaDate(raw);
+  return parsed?.getTime() || 0;
+}
+
+function dedupeEvents(events: any[]) {
+  const seen = new Set<string>();
+  return events.filter((event) => {
+    const key = `${String(event?.codigo_evento ?? event?.codigo ?? "")}|${String(event?.protocolo ?? event?.protocolo_evento ?? "")}|${eventVehicleCodeOf(event)}`;
+    if (seen.has(key)) return false;
+    seen.add(key);
+    return true;
+  });
+}
+
+async function lookupEventsInGeneralList(
+  normalizedPlate: string,
+  trace: SgaResolutionTrace[],
+  exactVehicle: any,
+  referenceDateInput?: unknown,
+) {
+  // A data vem preferencialmente do navegador do usuário. Isso evita depender
+  // do relógio/data do runtime da Vercel para montar as janelas históricas.
+  const referenceDate = resolveReferenceDate(referenceDateInput);
+  const rawContractDate = exactVehicle?.data_contrato ?? exactVehicle?.data_cadastro ?? exactVehicle?.data_reativacao ?? "";
+  const parsedContractDate = parseSgaDate(rawContractDate);
+
+  // O evento não pode ser anterior à existência do veículo no SGA. Quando a API
+  // não trouxer nenhuma data utilizável, usamos uma margem ampla de 20 anos.
+  const fallbackLowerBound = addDays(referenceDate, -(366 * 20));
+  const lowerBound = parsedContractDate && parsedContractDate.getTime() <= referenceDate.getTime()
+    ? parsedContractDate
+    : fallbackLowerBound;
+
+  trace.push({
+    step: "event_general_list_reference",
+    lookup: formatSgaDate(referenceDate),
+    ok: true,
+    message: parsedContractDate
+      ? `Busca histórica até a data de contrato/cadastro do veículo: ${formatSgaDate(lowerBound)}.`
+      : `O SGA não informou data de contrato/cadastro utilizável; aplicada margem histórica de segurança.`,
+  });
 
   const windowDays = 30;
-  const maxDaysBack = 365;
-  const pageSize = 1000;
-  const maxPagesPerWindow = 10;
+  const pageSize = 500;
+  const hardPageSafetyLimit = 100;
+  let cursorEnd = referenceDate;
+  let windowsSearched = 0;
 
-  for (let daysBack = 0; daysBack < maxDaysBack; daysBack += windowDays) {
-    const end = addDays(today, -daysBack);
-    const start = addDays(end, -(windowDays - 1));
+  while (cursorEnd.getTime() >= lowerBound.getTime()) {
+    const naturalStart = addDays(cursorEnd, -(windowDays - 1));
+    const start = laterDate(naturalStart, lowerBound);
+    const end = cursorEnd;
     const label = `${formatSgaDate(start)}–${formatSgaDate(end)}`;
+    windowsSearched += 1;
 
-    for (let page = 0; page < maxPagesPerWindow; page += 1) {
+    const matchesInWindow: any[] = [];
+    let page = 0;
+
+    while (page < hardPageSafetyLimit) {
       try {
         const data = await listSgaEventsByDateRange(start, end, page, pageSize);
         const rawEvents = eventsFrom(data);
         const normalizedEvents = rawEvents.map(normalizeSgaEvent);
-        const exactEvents = normalizedEvents.filter((event) => eventPlateOf(event) === normalizedPlate);
+        matchesInWindow.push(...normalizedEvents.filter((event) => eventPlateOf(event) === normalizedPlate));
+
+        const totalPagesRaw = data?.paginacao?.numero_paginas ?? data?.paginacao?.total_paginas;
+        const totalPages = Number(totalPagesRaw);
+        const hasKnownTotalPages = Number.isFinite(totalPages) && totalPages > 0;
 
         trace.push({
           step: "event_general_list_exact_plate",
           lookup: `${label} / página ${page + 1}`,
-          ok: exactEvents.length > 0,
-          message: exactEvents.length > 0
-            ? `${exactEvents.length} evento(s) localizado(s) automaticamente na listagem geral para ${normalizedPlate}.`
+          ok: matchesInWindow.length > 0,
+          message: matchesInWindow.length > 0
+            ? `${matchesInWindow.length} evento(s) da placa ${normalizedPlate} localizado(s) nesta janela.`
             : `${rawEvents.length} evento(s) analisado(s) nesta página; nenhum pertence à placa ${normalizedPlate}.`,
-          returnedPlates: exactEvents.length > 0
-            ? Array.from(new Set(exactEvents.map((event) => eventPlateOf(event)).filter(Boolean))).slice(0, 8)
-            : [],
+          returnedPlates: matchesInWindow.length > 0 ? [normalizedPlate] : [],
         });
 
-        if (exactEvents.length > 0) {
-          const eventVehicleCode = eventVehicleCodeOf(exactEvents[0]);
-          return {
-            data: { eventos: exactEvents },
-            vehicleCode: eventVehicleCode,
-            resolvedBy: "event_list_exact_plate",
-          };
-        }
-
-        const totalPages = Number(data?.paginacao?.numero_paginas ?? data?.paginacao?.total_paginas ?? 0);
-        if (rawEvents.length < pageSize || (Number.isFinite(totalPages) && totalPages > 0 && page + 1 >= totalPages)) {
-          break;
-        }
+        if (rawEvents.length === 0) break;
+        if (hasKnownTotalPages && page + 1 >= totalPages) break;
+        if (!hasKnownTotalPages && rawEvents.length < pageSize) break;
+        page += 1;
       } catch (error: any) {
         trace.push({
           step: "event_general_list_exact_plate",
@@ -318,17 +402,41 @@ async function lookupEventsInGeneralList(normalizedPlate: string, trace: SgaReso
           ...(error?.status ? { status: Number(error.status) } : {}),
           message: String(error?.message || error),
         });
-        // Se uma janela falhar por limitação momentânea, seguimos para a próxima
-        // em vez de abandonar toda a resolução da placa.
+        // Uma janela que falhou não deve derrubar toda a estratégia. Continuamos
+        // para a próxima janela histórica, mantendo o diagnóstico para Admin/Dev.
         break;
       }
     }
+
+    const exactEvents = dedupeEvents(matchesInWindow).sort((a, b) => eventSortValue(b) - eventSortValue(a));
+    if (exactEvents.length > 0) {
+      const eventVehicleCode = eventVehicleCodeOf(exactEvents[0]);
+      return {
+        data: { eventos: exactEvents },
+        vehicleCode: eventVehicleCode,
+        resolvedBy: "event_list_exact_plate",
+        referenceDate: formatIsoDate(referenceDate),
+        vehicleContractDate: parsedContractDate ? formatIsoDate(lowerBound) : null,
+        windowsSearched,
+      };
+    }
+
+    // Próxima janela termina no dia imediatamente anterior ao início da atual,
+    // sem sobreposição e sem buracos entre os intervalos.
+    cursorEnd = addDays(start, -1);
   }
 
-  return null;
+  return {
+    data: null,
+    vehicleCode: "",
+    resolvedBy: "",
+    referenceDate: formatIsoDate(referenceDate),
+    vehicleContractDate: parsedContractDate ? formatIsoDate(lowerBound) : null,
+    windowsSearched,
+  };
 }
 
-export async function resolveSgaEventsByPlate(value: unknown) {
+export async function resolveSgaEventsByPlate(value: unknown, options: { referenceDate?: unknown } = {}) {
   const normalizedPlate = normalizeSgaPlate(value);
   if (!normalizedPlate) throw new Error("SGA_PLATE_EMPTY");
 
@@ -431,8 +539,8 @@ export async function resolveSgaEventsByPlate(value: unknown) {
   // 4) Fallback automático final: consulta a listagem geral de eventos em
   // janelas de 30 dias e filtra SOMENTE a placa exata. Isso evita exigir que o
   // operador abra o SGA para descobrir ou digitar protocolo.
-  const generalLookup = await lookupEventsInGeneralList(normalizedPlate, trace);
-  if (generalLookup) {
+  const generalLookup = await lookupEventsInGeneralList(normalizedPlate, trace, exactVehicle, options.referenceDate);
+  if (generalLookup.data) {
     return {
       data: generalLookup.data,
       normalizedPlate,
@@ -440,6 +548,9 @@ export async function resolveSgaEventsByPlate(value: unknown) {
       vehicle: exactVehicle,
       resolvedBy: generalLookup.resolvedBy,
       trace,
+      referenceDate: generalLookup.referenceDate,
+      vehicleContractDate: generalLookup.vehicleContractDate,
+      windowsSearched: generalLookup.windowsSearched,
     };
   }
 
@@ -451,6 +562,9 @@ export async function resolveSgaEventsByPlate(value: unknown) {
   finalError.trace = trace;
   finalError.normalizedPlate = normalizedPlate;
   finalError.vehicleCode = vehicleCode;
+  finalError.referenceDate = generalLookup.referenceDate;
+  finalError.vehicleContractDate = generalLookup.vehicleContractDate;
+  finalError.windowsSearched = generalLookup.windowsSearched;
   throw finalError;
 }
 

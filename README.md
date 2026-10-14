@@ -202,10 +202,20 @@ Esta versão não adiciona novas gravações diretas pelo navegador. As informa�
 - Respostas de outras placas são descartadas antes de aparecer na interface ou serem usadas no envio de documentos.
 - O envio ao SGA reutiliza a mesma validação estrita.
 
-## V1.39.12 — Fallback automático pela listagem geral de eventos
+## V1.39.13 — Fallback automático pela listagem geral de eventos
 - Mantém a busca estrita por veículo e a consulta específica `listar/evento-veiculo`.
 - Se o endpoint específico do SGA responder de forma inconsistente, o Portal consulta automaticamente `POST listar/evento` em janelas de até 30 dias e filtra localmente somente a placa exata.
 - O fallback pesquisa automaticamente eventos recentes sem pedir protocolo ao operador.
 - Retornos do endpoint geral são normalizados para o mesmo formato usado no Portal, inclusive quando placa, veículo e associado vêm em objetos internos.
 - O envio de PDF foi ajustado para validar diretamente placa + código do veículo do evento selecionado, inclusive quando o evento foi encontrado pelo fallback geral.
 - Nenhuma nova variável de ambiente ou regra de Firestore é necessária nesta versão.
+
+
+## V1.39.13 — busca histórica robusta de eventos SGA
+
+- A data de referência da busca SGA passa a vir do navegador do usuário, evitando divergência do relógio do runtime da Vercel.
+- O fallback geral pesquisa automaticamente em janelas consecutivas de até 30 dias, sem lacunas, até a data de contrato/cadastro do veículo.
+- Cada janela percorre a paginação do endpoint `listar/evento` antes de avançar para o período anterior.
+- A correspondência continua estrita: somente eventos cuja placa normalizada seja exatamente a placa consultada são aceitos.
+- A mesma data de referência é usada na revalidação feita imediatamente antes do envio do PDF ao SGA.
+- O diagnóstico exibe data de referência, data de contrato e quantidade de janelas pesquisadas.
