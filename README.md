@@ -229,3 +229,15 @@ Esta versão não adiciona novas gravações diretas pelo navegador. As informa�
 - Placas de terceiros são mascaradas no diagnóstico; a placa pesquisada permanece visível apenas quando houver correspondência exata.
 - O diagnóstico técnico não é enviado para Administrador, Atendente ou Consulta.
 - Nenhuma regra de segurança foi relaxada e nenhum evento é aceito por aproximação: o upload continua bloqueado sem correspondência confirmada da placa.
+
+
+## V1.39.15 — busca adaptativa e erro HTTP real do SGA
+
+- O fallback de `POST listar/evento` deixa de solicitar 500 registros e passa a começar em 100, limite padrão documentado para a listagem de eventos.
+- Se o SGA rejeitar a requisição, o Portal reduz automaticamente a paginação (`100 → 50 → 25 → 10`) e, se necessário, a janela (`30 → 15 → 7 → 1 dia`) sem pedir protocolo ou qualquer ação manual ao operador.
+- Uma tentativa que falhar no meio da paginação é descartada e refeita do início com parâmetros menores, evitando misturar retorno parcial com dados válidos.
+- O diagnóstico exclusivo do Desenvolvedor passa a registrar HTTP, mensagem retornada pelo SGA, janela, tamanho de página e página exata de cada tentativa recusada.
+- O teste de conexão compara uma chamada mínima (1 registro) com uma chamada de 100 registros para separar permissão de limitação operacional do endpoint.
+- Depois que uma combinação é aceita pelo SGA, ela é reutilizada nas janelas históricas seguintes até a data de contrato/cadastro do veículo.
+- A validação estrita de placa permanece inalterada: nenhum evento de outra placa pode ser selecionado ou receber PDF.
+- Nenhuma nova ENV ou regra de Firestore é necessária.

@@ -203,7 +203,7 @@ export async function listSgaEventsByDateRange(
   startDate: Date,
   endDate: Date,
   page = 0,
-  pageSize = 500,
+  pageSize = 100,
 ) {
   return sgaFetch("listar/evento", {
     method: "POST",
@@ -253,6 +253,8 @@ type SgaResolutionTrace = {
 
 type SgaGeneralListDebugPage = {
   window: string;
+  windowDays: number;
+  pageSize: number;
   page: number;
   rawCount: number;
   responseShape: "array" | "object" | "other";
@@ -273,11 +275,25 @@ type SgaGeneralListDebugPage = {
   vehicleCodeSamples: string[];
 };
 
+type SgaGeneralListDebugAttempt = {
+  window: string;
+  windowDays: number;
+  pageSize: number;
+  page: number;
+  ok: boolean;
+  status?: number;
+  message: string;
+};
+
 type SgaGeneralListDebug = {
   targetPlate: string;
   targetVehicleCode: string;
-  pageSize: number;
+  requestedPageSizes: number[];
+  requestedWindowDays: number[];
+  effectivePageSize: number | null;
+  effectiveWindowDays: number | null;
   pages: SgaGeneralListDebugPage[];
+  attempts: SgaGeneralListDebugAttempt[];
   capped: boolean;
 };
 
@@ -338,6 +354,8 @@ function makeGeneralDebugPage(
   normalizedPlate: string,
   vehicleCode: string,
   label: string,
+  windowDays: number,
+  pageSize: number,
   page: number,
 ): SgaGeneralListDebugPage {
   const eventKeySet = new Set<string>();
@@ -384,6 +402,8 @@ function makeGeneralDebugPage(
 
   return {
     window: label,
+    windowDays,
+    pageSize,
     page: page + 1,
     rawCount: rawEvents.length,
     responseShape: responseShape(data),
@@ -502,86 +522,213 @@ async function lookupEventsInGeneralList(
       : `O SGA não informou data de contrato/cadastro utilizável; aplicada margem histórica de segurança.`,
   });
 
-  const windowDays = 30;
-  const pageSize = 500;
-  const hardPageSafetyLimit = 100;
+  // V1.39.15: o SGA provou aceitar o mesmo endpoint com quantidade pequena no
+  // teste de conexão, mas recusou a busca histórica usando 500 registros. A
+  // estratégia agora começa no limite documentado de 100 e reduz tanto a
+  // paginação quanto a janela de datas somente quando o provedor rejeitar a
+  // requisição. O operador não precisa informar nenhum parâmetro.
+  const pageSizeCandidates = [100, 50, 25, 10];
+  const windowDayCandidates = [30, 15, 7, 1];
+  const hardPageSafetyLimit = 250;
+  const hardDebugPageLimit = 180;
+  const hardDebugAttemptLimit = 220;
   const generalDebug: SgaGeneralListDebug = {
     targetPlate: normalizedPlate,
     targetVehicleCode: vehicleCodeOf(exactVehicle),
-    pageSize,
+    requestedPageSizes: pageSizeCandidates,
+    requestedWindowDays: windowDayCandidates,
+    effectivePageSize: null,
+    effectiveWindowDays: null,
     pages: [],
+    attempts: [],
     capped: false,
   };
+
+  function addAttempt(item: SgaGeneralListDebugAttempt) {
+    if (generalDebug.attempts.length < hardDebugAttemptLimit) generalDebug.attempts.push(item);
+    else generalDebug.capped = true;
+  }
+
+  function addDebugPage(item: SgaGeneralListDebugPage) {
+    if (generalDebug.pages.length < hardDebugPageLimit) generalDebug.pages.push(item);
+    else generalDebug.capped = true;
+  }
+
+  let preferredWindowDays: number | null = null;
+  let preferredPageSize: number | null = null;
   let cursorEnd = referenceDate;
   let windowsSearched = 0;
+  let consecutiveUnqueryableDays = 0;
 
   while (cursorEnd.getTime() >= lowerBound.getTime()) {
-    const naturalStart = addDays(cursorEnd, -(windowDays - 1));
-    const start = laterDate(naturalStart, lowerBound);
-    const end = cursorEnd;
-    const label = `${formatSgaDate(start)}–${formatSgaDate(end)}`;
-    windowsSearched += 1;
+    // Depois que uma combinação funciona, ela vira a primeira opção nas janelas
+    // seguintes. Se falhar mais adiante, os fallbacks continuam disponíveis.
+    const windowCandidates: number[] = preferredWindowDays !== null
+      ? [preferredWindowDays, ...windowDayCandidates.filter((value: number) => value !== preferredWindowDays)]
+      : [...windowDayCandidates];
 
-    const matchesInWindow: any[] = [];
-    let page = 0;
+    let completedWindow: {
+      start: Date;
+      end: Date;
+      label: string;
+      windowDays: number;
+      pageSize: number;
+      matches: any[];
+    } | null = null;
 
-    while (page < hardPageSafetyLimit) {
-      try {
-        const data = await listSgaEventsByDateRange(start, end, page, pageSize);
-        const rawEvents = eventsFrom(data);
-        const normalizedEvents = rawEvents.map(normalizeSgaEvent);
-        matchesInWindow.push(...normalizedEvents.filter((event) => eventPlateOf(event) === normalizedPlate));
+    for (const requestedWindowDays of windowCandidates) {
+      const naturalStart = addDays(cursorEnd, -(requestedWindowDays - 1));
+      const start = laterDate(naturalStart, lowerBound);
+      const end = cursorEnd;
+      const actualWindowDays = Math.max(1, Math.round((end.getTime() - start.getTime()) / 86400000) + 1);
+      const label = `${formatSgaDate(start)}–${formatSgaDate(end)}`;
+      const pageCandidates: number[] = preferredPageSize !== null
+        ? [preferredPageSize, ...pageSizeCandidates.filter((value: number) => value !== preferredPageSize)]
+        : [...pageSizeCandidates];
 
-        if (generalDebug.pages.length < 180) {
-          generalDebug.pages.push(makeGeneralDebugPage(
-            data,
-            rawEvents,
-            normalizedPlate,
-            generalDebug.targetVehicleCode,
-            label,
-            page,
-          ));
-        } else {
-          generalDebug.capped = true;
+      for (const pageSize of pageCandidates) {
+        const matchesInAttempt: any[] = [];
+        let page = 0;
+        let attemptFailed = false;
+        let firstFailure: any = null;
+
+        while (page < hardPageSafetyLimit) {
+          try {
+            const data = await listSgaEventsByDateRange(start, end, page, pageSize);
+            const rawEvents = eventsFrom(data);
+            const normalizedEvents = rawEvents.map(normalizeSgaEvent);
+            const exactMatches = normalizedEvents.filter((event) => eventPlateOf(event) === normalizedPlate);
+            matchesInAttempt.push(...exactMatches);
+
+            addAttempt({
+              window: label,
+              windowDays: actualWindowDays,
+              pageSize,
+              page: page + 1,
+              ok: true,
+              message: `${rawEvents.length} evento(s) retornado(s).`,
+            });
+            addDebugPage(makeGeneralDebugPage(
+              data,
+              rawEvents,
+              normalizedPlate,
+              generalDebug.targetVehicleCode,
+              label,
+              actualWindowDays,
+              pageSize,
+              page,
+            ));
+
+            const totalPagesRaw = data?.paginacao?.numero_paginas ?? data?.paginacao?.total_paginas;
+            const totalPages = Number(totalPagesRaw);
+            const hasKnownTotalPages = Number.isFinite(totalPages) && totalPages > 0;
+
+            trace.push({
+              step: "event_general_list_exact_plate",
+              lookup: `${label} / página ${page + 1} / ${pageSize} registros`,
+              ok: exactMatches.length > 0,
+              message: exactMatches.length > 0
+                ? `${exactMatches.length} evento(s) da placa ${normalizedPlate} localizado(s) nesta página.`
+                : `${rawEvents.length} evento(s) analisado(s); nenhum pertence à placa ${normalizedPlate}.`,
+              returnedPlates: exactMatches.length > 0 ? [normalizedPlate] : [],
+            });
+
+            if (rawEvents.length === 0) break;
+            if (hasKnownTotalPages && page + 1 >= totalPages) break;
+            if (!hasKnownTotalPages && rawEvents.length < pageSize) break;
+            page += 1;
+          } catch (error: any) {
+            attemptFailed = true;
+            firstFailure = error;
+            const status = error?.status ? Number(error.status) : undefined;
+            const message = String(error?.message || error || "Erro desconhecido do SGA.");
+            addAttempt({
+              window: label,
+              windowDays: actualWindowDays,
+              pageSize,
+              page: page + 1,
+              ok: false,
+              ...(status ? { status } : {}),
+              message,
+            });
+            trace.push({
+              step: "event_general_list_adaptive_error",
+              lookup: `${label} / página ${page + 1} / ${pageSize} registros`,
+              ok: false,
+              ...(status ? { status } : {}),
+              message,
+            });
+            break;
+          }
         }
 
-        const totalPagesRaw = data?.paginacao?.numero_paginas ?? data?.paginacao?.total_paginas;
-        const totalPages = Number(totalPagesRaw);
-        const hasKnownTotalPages = Number.isFinite(totalPages) && totalPages > 0;
+        if (page >= hardPageSafetyLimit) {
+          generalDebug.capped = true;
+          attemptFailed = true;
+          firstFailure = new Error(`Limite de segurança de ${hardPageSafetyLimit} páginas atingido.`);
+          addAttempt({
+            window: label,
+            windowDays: actualWindowDays,
+            pageSize,
+            page: hardPageSafetyLimit,
+            ok: false,
+            message: String(firstFailure.message),
+          });
+        }
 
-        trace.push({
-          step: "event_general_list_exact_plate",
-          lookup: `${label} / página ${page + 1}`,
-          ok: matchesInWindow.length > 0,
-          message: matchesInWindow.length > 0
-            ? `${matchesInWindow.length} evento(s) da placa ${normalizedPlate} localizado(s) nesta janela.`
-            : `${rawEvents.length} evento(s) analisado(s) nesta página; nenhum pertence à placa ${normalizedPlate}.`,
-          returnedPlates: matchesInWindow.length > 0 ? [normalizedPlate] : [],
-        });
+        if (!attemptFailed) {
+          preferredWindowDays = requestedWindowDays;
+          preferredPageSize = pageSize;
+          generalDebug.effectiveWindowDays = actualWindowDays;
+          generalDebug.effectivePageSize = pageSize;
+          completedWindow = {
+            start,
+            end,
+            label,
+            windowDays: actualWindowDays,
+            pageSize,
+            matches: dedupeEvents(matchesInAttempt).sort((a, b) => eventSortValue(b) - eventSortValue(a)),
+          };
+          break;
+        }
 
-        if (rawEvents.length === 0) break;
-        if (hasKnownTotalPages && page + 1 >= totalPages) break;
-        if (!hasKnownTotalPages && rawEvents.length < pageSize) break;
-        page += 1;
-      } catch (error: any) {
+        // Não usamos dados parciais de uma tentativa que falhou no meio da
+        // paginação. Reiniciamos a mesma janela com um tamanho menor.
         trace.push({
-          step: "event_general_list_exact_plate",
-          lookup: `${label} / página ${page + 1}`,
+          step: "event_general_list_adaptive_retry",
+          lookup: `${label} / ${pageSize} registros`,
           ok: false,
-          ...(error?.status ? { status: Number(error.status) } : {}),
-          message: String(error?.message || error),
+          ...(firstFailure?.status ? { status: Number(firstFailure.status) } : {}),
+          message: `Tentativa descartada e será refeita automaticamente com parâmetros menores.`,
         });
-        // Uma janela que falhou não deve derrubar toda a estratégia. Continuamos
-        // para a próxima janela histórica, mantendo o diagnóstico para Admin/Dev.
-        break;
       }
+
+      if (completedWindow) break;
     }
 
-    const exactEvents = dedupeEvents(matchesInWindow).sort((a, b) => eventSortValue(b) - eventSortValue(a));
-    if (exactEvents.length > 0) {
-      const eventVehicleCode = eventVehicleCodeOf(exactEvents[0]);
+    if (!completedWindow) {
+      // Se até 1 dia / 10 registros falhar, avançar muitos anos repetindo a
+      // mesma falha seria inútil. Testamos o dia anterior para cobrir diferença
+      // de virada de data e então encerramos com o HTTP real no diagnóstico.
+      consecutiveUnqueryableDays += 1;
+      trace.push({
+        step: "event_general_list_unqueryable",
+        lookup: formatSgaDate(cursorEnd),
+        ok: false,
+        message: `O endpoint geral recusou todas as combinações automáticas de janela/paginação para este dia.`,
+      });
+      if (consecutiveUnqueryableDays >= 2) break;
+      cursorEnd = addDays(cursorEnd, -1);
+      continue;
+    }
+
+    consecutiveUnqueryableDays = 0;
+    windowsSearched += 1;
+
+    if (completedWindow.matches.length > 0) {
+      const eventVehicleCode = eventVehicleCodeOf(completedWindow.matches[0]);
       return {
-        data: { eventos: exactEvents },
+        data: { eventos: completedWindow.matches },
         vehicleCode: eventVehicleCode,
         resolvedBy: "event_list_exact_plate",
         referenceDate: formatIsoDate(referenceDate),
@@ -592,8 +739,8 @@ async function lookupEventsInGeneralList(
     }
 
     // Próxima janela termina no dia imediatamente anterior ao início da atual,
-    // sem sobreposição e sem buracos entre os intervalos.
-    cursorEnd = addDays(start, -1);
+    // sem sobreposição e sem buracos entre os intervalos que de fato funcionaram.
+    cursorEnd = addDays(completedWindow.start, -1);
   }
 
   return {

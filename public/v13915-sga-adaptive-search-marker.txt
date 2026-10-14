@@ -1,0 +1,1 @@
+V1.39.15 - busca adaptativa no listar/evento, reduzindo paginação e janela automaticamente e expondo HTTP real somente ao Desenvolvedor.

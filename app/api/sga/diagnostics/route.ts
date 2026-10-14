@@ -27,14 +27,18 @@ export async function GET(req: NextRequest) {
     if (!config.configured) return Response.json({ ok: false, config, error: "Integração SGA ainda não configurada na Vercel." }, { status: 503 });
 
     await authenticateSga(true);
-    const today = new Date();
-    const [departmentsCheck, statusesCheck, typesCheck, eventSituationsCheck, photoTypesCheck, generalEventsCheck] = await Promise.all([
+    const referenceDate = String(req.nextUrl.searchParams.get("referenceDate") || "").trim();
+    const today = /^\d{4}-\d{2}-\d{2}$/.test(referenceDate)
+      ? new Date(`${referenceDate}T12:00:00.000Z`)
+      : new Date();
+    const [departmentsCheck, statusesCheck, typesCheck, eventSituationsCheck, photoTypesCheck, generalEventsCheck, generalEvents100Check] = await Promise.all([
       check(listSgaDepartments),
       check(listSgaStatuses),
       check(listSgaTypes),
       check(listSgaEventSituations),
       check(listSgaPhotoTypes),
       check(() => listSgaEventsByDateRange(today, today, 0, 1)),
+      check(() => listSgaEventsByDateRange(today, today, 0, 100)),
     ]);
 
     return Response.json({
@@ -53,6 +57,7 @@ export async function GET(req: NextRequest) {
         eventSituations: { ok: eventSituationsCheck.ok, error: eventSituationsCheck.error },
         photoTypes: { ok: photoTypesCheck.ok, error: photoTypesCheck.error },
         generalEvents: { ok: generalEventsCheck.ok, error: generalEventsCheck.error },
+        generalEvents100: { ok: generalEvents100Check.ok, error: generalEvents100Check.error },
       },
     });
   } catch (e: any) {

@@ -35,7 +35,7 @@ export default function SGAPage() {
     setDiagnostic(null);
     try {
       const t = await token();
-      const res = await fetch(`/api/sga/diagnostics?t=${Date.now()}`, {
+      const res = await fetch(`/api/sga/diagnostics?referenceDate=${encodeURIComponent(localReferenceDate())}&t=${Date.now()}`, {
         headers: { Authorization: `Bearer ${t}` },
         cache: "no-store",
       });
@@ -111,7 +111,8 @@ export default function SGAPage() {
               <span className={diagnostic.checks?.departments?.ok ? "ok" : "fail"}>Atendimento / departamentos: {diagnostic.checks?.departments?.ok ? "OK" : diagnostic.checks?.departments?.error || "Sem permissão"}</span>
               <span className={diagnostic.checks?.statuses?.ok ? "ok" : "fail"}>Atendimento / status: {diagnostic.checks?.statuses?.ok ? "OK" : diagnostic.checks?.statuses?.error || "Sem permissão"}</span>
               <span className={diagnostic.checks?.types?.ok ? "ok" : "fail"}>Atendimento / tipos: {diagnostic.checks?.types?.ok ? "OK" : diagnostic.checks?.types?.error || "Sem permissão"}</span>
-              <span className={diagnostic.checks?.generalEvents?.ok ? "ok" : "fail"}>Evento / listar geral: {diagnostic.checks?.generalEvents?.ok ? "OK" : diagnostic.checks?.generalEvents?.error || "Sem permissão"}</span>
+              <span className={diagnostic.checks?.generalEvents?.ok ? "ok" : "fail"}>Evento / listar (1): {diagnostic.checks?.generalEvents?.ok ? "OK" : diagnostic.checks?.generalEvents?.error || "Falhou"}</span>
+              <span className={diagnostic.checks?.generalEvents100?.ok ? "ok" : "fail"}>Evento / listar (100): {diagnostic.checks?.generalEvents100?.ok ? "OK" : diagnostic.checks?.generalEvents100?.error || "Falhou"}</span>
             </div>
 
             {!diagnostic.checks?.photoTypes?.ok && (
@@ -122,7 +123,12 @@ export default function SGAPage() {
 
             {!diagnostic.checks?.generalEvents?.ok && (
               <div className="info-note sga-permission-note">
-                A credencial autenticou, mas o teste do endpoint geral falhou. Confira no SGA a permissão <strong>Evento → Listar</strong> tanto no token da aplicação quanto no usuário exclusivo da API.
+                A credencial autenticou, mas até a chamada mínima do endpoint geral falhou. Confira no SGA a permissão <strong>Evento → Listar</strong> e o retorno técnico do provedor.
+              </div>
+            )}
+            {diagnostic.checks?.generalEvents?.ok && !diagnostic.checks?.generalEvents100?.ok && (
+              <div className="info-note sga-permission-note">
+                O endpoint <strong>Evento → Listar</strong> aceita a chamada mínima, mas recusou 100 registros. A busca por placa reduzirá automaticamente o tamanho da página e a janela até encontrar uma combinação aceita pelo SGA.
               </div>
             )}
 
@@ -154,6 +160,8 @@ export default function SGAPage() {
               <span key={`${item.step}-${index}`}>
                 {index > 0 ? " • " : ""}
                 {item.ok ? "OK" : "descartado"}: {item.lookup}
+                {item.status ? ` (HTTP ${item.status})` : ""}
+                {item.message ? ` — ${item.message}` : ""}
                 {Array.isArray(item.returnedPlates) && item.returnedPlates.length > 0 ? ` → ${item.returnedPlates.join(", ")}` : ""}
               </span>
             ))}
@@ -162,22 +170,47 @@ export default function SGAPage() {
 
         {eventResolution?.developerDebug && (
           <details className="sga-debug-panel" open>
-            <summary>Diagnóstico técnico V1.39.14 — somente Desenvolvedor</summary>
+            <summary>Diagnóstico técnico V1.39.15 — somente Desenvolvedor</summary>
             <div className="sga-debug-summary">
               <span>Placa alvo <strong>{eventResolution.developerDebug.targetPlate || plate}</strong></span>
               <span>Veículo alvo <strong>{eventResolution.developerDebug.targetVehicleCode || "—"}</strong></span>
-              <span>Página solicitada <strong>{eventResolution.developerDebug.pageSize || "—"} registros</strong></span>
+              <span>Página efetiva <strong>{eventResolution.developerDebug.effectivePageSize || "—"}</strong></span>
+              <span>Janela efetiva <strong>{eventResolution.developerDebug.effectiveWindowDays ? `${eventResolution.developerDebug.effectiveWindowDays} dia(s)` : "—"}</strong></span>
               <span>Páginas capturadas <strong>{Array.isArray(eventResolution.developerDebug.pages) ? eventResolution.developerDebug.pages.length : 0}</strong></span>
+              <span>Falhas capturadas <strong>{Array.isArray(eventResolution.developerDebug.attempts) ? eventResolution.developerDebug.attempts.filter((item: any) => !item.ok).length : 0}</strong></span>
             </div>
+
+            {Array.isArray(eventResolution.developerDebug.attempts) && eventResolution.developerDebug.attempts.some((item: any) => !item.ok) && (
+              <div className="sga-debug-table-wrap">
+                <table className="sga-debug-table">
+                  <thead><tr><th>Tentativa recusada</th><th>Janela</th><th>Pág.</th><th>Registros</th><th>HTTP</th><th>Mensagem SGA</th></tr></thead>
+                  <tbody>
+                    {eventResolution.developerDebug.attempts.filter((item: any) => !item.ok).slice(0, 30).map((item: any, index: number) => (
+                      <tr key={`attempt-${item.window}-${item.pageSize}-${item.page}-${index}`}>
+                        <td>{item.windowDays} dia(s)</td>
+                        <td>{item.window}</td>
+                        <td>{item.page}</td>
+                        <td>{item.pageSize}</td>
+                        <td>{item.status || "—"}</td>
+                        <td>{item.message || "—"}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )}
+
             <div className="sga-debug-table-wrap">
               <table className="sga-debug-table">
                 <thead>
-                  <tr><th>Janela</th><th>Pág.</th><th>Retorno</th><th>Placa conhecida</th><th>Qualquer campo placa</th><th>Cód. veículo</th><th>Formato</th></tr>
+                  <tr><th>Janela</th><th>Dias</th><th>Registros</th><th>Pág.</th><th>Retorno</th><th>Placa conhecida</th><th>Qualquer campo placa</th><th>Cód. veículo</th><th>Formato</th></tr>
                 </thead>
                 <tbody>
                   {(Array.isArray(eventResolution.developerDebug.pages) ? eventResolution.developerDebug.pages : []).slice(0, 40).map((item: any, index: number) => (
-                    <tr key={`${item.window}-${item.page}-${index}`} className={item.anyPlateFieldExactMatches > 0 || item.exactVehicleCodeMatches > 0 ? "debug-hit" : ""}>
+                    <tr key={`${item.window}-${item.page}-${item.pageSize}-${index}`} className={item.anyPlateFieldExactMatches > 0 || item.exactVehicleCodeMatches > 0 ? "debug-hit" : ""}>
                       <td>{item.window}</td>
+                      <td>{item.windowDays}</td>
+                      <td>{item.pageSize}</td>
                       <td>{item.page}</td>
                       <td>{item.rawCount}</td>
                       <td>{item.knownExactPlateMatches}</td>
@@ -192,10 +225,14 @@ export default function SGAPage() {
             {(() => {
               const pages = Array.isArray(eventResolution.developerDebug.pages) ? eventResolution.developerDebug.pages : [];
               const structure = pages.find((item: any) => item.anyPlateFieldExactMatches > 0 || item.exactVehicleCodeMatches > 0) || pages.find((item: any) => item.rawCount > 0) || pages[0];
-              if (!structure) return <div className="sga-debug-structure">Nenhuma resposta de página foi capturada.</div>;
+              if (!structure) {
+                const failed = Array.isArray(eventResolution.developerDebug.attempts) ? eventResolution.developerDebug.attempts.filter((item: any) => !item.ok) : [];
+                const last = failed.at(-1);
+                return <div className="sga-debug-structure">Nenhuma página foi aceita pelo SGA.{last ? <> Último retorno: {last.status ? `HTTP ${last.status} — ` : ""}{last.message}</> : null}</div>;
+              }
               return (
                 <div className="sga-debug-structure">
-                  <strong>Estrutura observada em {structure.window} / página {structure.page}</strong>
+                  <strong>Estrutura observada em {structure.window} / página {structure.page} / {structure.pageSize} registros</strong>
                   <span><b>Chaves do evento:</b> {Array.isArray(structure.eventKeys) && structure.eventKeys.length ? structure.eventKeys.join(", ") : "—"}</span>
                   <span><b>Chaves de veiculo:</b> {Array.isArray(structure.vehicleKeys) && structure.vehicleKeys.length ? structure.vehicleKeys.join(", ") : "—"}</span>
                   <span><b>Caminhos contendo placa:</b> {Array.isArray(structure.detectedPlatePaths) && structure.detectedPlatePaths.length ? structure.detectedPlatePaths.join(", ") : "nenhum"}</span>
