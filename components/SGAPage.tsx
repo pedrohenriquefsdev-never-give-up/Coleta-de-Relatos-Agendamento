@@ -3,6 +3,7 @@
 import { Database, RefreshCw, Search } from "lucide-react";
 import { useState } from "react";
 import { useSession } from "./AuthGate";
+import { isPortalDeveloperUid } from "@/lib/access-control";
 import Plate from "./Plate";
 
 
@@ -19,6 +20,7 @@ function asArray(value: any): any[] {
 
 export default function SGAPage() {
   const { user } = useSession();
+  const developer = isPortalDeveloperUid(user?.uid);
   const [checking, setChecking] = useState(false);
   const [diagnostic, setDiagnostic] = useState<any>(null);
   const [error, setError] = useState("");
@@ -26,6 +28,10 @@ export default function SGAPage() {
   const [searching, setSearching] = useState(false);
   const [eventResult, setEventResult] = useState<any>(null);
   const [eventResolution, setEventResolution] = useState<any>(null);
+  const [protocolDiagnostic, setProtocolDiagnostic] = useState<any>(null);
+  const [protocolChecking, setProtocolChecking] = useState(false);
+  const [protocolError, setProtocolError] = useState("");
+  const [diagnosticProtocol, setDiagnosticProtocol] = useState("20265469");
 
   async function token() { return user?.getIdToken(); }
 
@@ -46,6 +52,33 @@ export default function SGAPage() {
       setError(e instanceof Error ? e.message : "Falha ao testar o SGA.");
     } finally {
       setChecking(false);
+    }
+  }
+
+  async function runProtocolDiagnostic() {
+    const protocol = diagnosticProtocol.trim();
+    if (!protocol) return setProtocolError("Informe um protocolo para o diagnóstico.");
+    setProtocolChecking(true);
+    setProtocolError("");
+    setProtocolDiagnostic(null);
+    try {
+      const t = await token();
+      const params = new URLSearchParams({
+        protocol,
+        plate: plate.toUpperCase().replace(/[^A-Z0-9]/g, ""),
+        t: String(Date.now()),
+      });
+      const res = await fetch(`/api/sga/protocol-diagnostic?${params.toString()}`, {
+        headers: { Authorization: `Bearer ${t}` },
+        cache: "no-store",
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(`${data.error || "Falha no diagnóstico por protocolo."}${data.technical ? ` — ${data.technical}` : ""}`);
+      setProtocolDiagnostic(data);
+    } catch (e) {
+      setProtocolError(e instanceof Error ? e.message : "Falha no diagnóstico por protocolo.");
+    } finally {
+      setProtocolChecking(false);
     }
   }
 
@@ -216,6 +249,43 @@ export default function SGAPage() {
         </div>
         <small className="field-help">Pode digitar com ou sem hífen. O Portal normaliza a placa e só aceita veículo/evento cuja placa retornada corresponda exatamente à consulta.</small>
 
+        {developer && (
+          <div className="sga-debug-panel" style={{ marginTop: 12 }}>
+            <div className="sga-debug-structure">
+              <strong>Diagnóstico direto V1.39.19 — protocolo conhecido</strong>
+              <span>Teste temporário exclusivo do Desenvolvedor. Ele não muda o fluxo do operador: serve apenas para verificar se a API consegue enxergar diretamente o evento de teste pelo protocolo.</span>
+              <div className="sga-search-row">
+                <input
+                  className="input"
+                  value={diagnosticProtocol}
+                  onChange={(e) => setDiagnosticProtocol(e.target.value.replace(/[^0-9]/g, "").slice(0, 20))}
+                  placeholder="Protocolo do evento"
+                />
+                <button className="btn" onClick={runProtocolDiagnostic} disabled={protocolChecking}>
+                  <Search size={15} /> {protocolChecking ? "Testando..." : "Testar protocolo"}
+                </button>
+              </div>
+              <small>Placa usada na validação: <b>{plate || "nenhuma informada"}</b>. Para o teste atual, deixe <b>GPV0000</b> no campo de placa acima.</small>
+              {protocolError && <div className="error">{protocolError}</div>}
+              {protocolDiagnostic && (
+                <>
+                  <div className="sga-debug-summary">
+                    <span>Protocolo visível <strong>{protocolDiagnostic.protocolVisible ? "SIM" : "NÃO"}</strong></span>
+                    <span>Placa exata visível <strong>{protocolDiagnostic.exactPlateVisible ? "SIM" : "NÃO"}</strong></span>
+                    <span>Registros retornados <strong>{protocolDiagnostic.rawCount ?? 0}</strong></span>
+                    <span>Correspondências do protocolo <strong>{protocolDiagnostic.protocolMatchCount ?? 0}</strong></span>
+                  </div>
+                  {Array.isArray(protocolDiagnostic.events) && protocolDiagnostic.events.length > 0 ? protocolDiagnostic.events.map((item: any, index: number) => (
+                    <span key={`protocol-${item.codigo_evento || index}`}>
+                      <b>Evento:</b> {item.codigo_evento || "—"} • <b>Protocolo:</b> {item.protocolo || "—"} • <b>Placa:</b> {item.placa || "—"} • <b>Veículo:</b> {item.codigo_veiculo || "—"} • <b>Situação:</b> {item.situacao_evento || "—"} • <b>Motivo:</b> {item.motivo || "—"} • <b>Cooperativa:</b> {item.cooperativa?.nome || item.cooperativa?.codigo || "—"} • <b>Regional:</b> {item.regional?.nome || item.regional?.codigo || "—"}
+                    </span>
+                  )) : <span><b>Resultado:</b> o SGA respondeu, mas não devolveu o protocolo informado para este usuário/token da API.</span>}
+                </>
+              )}
+            </div>
+          </div>
+        )}
+
         {error && Array.isArray(eventResolution?.trace) && eventResolution.trace.length > 0 && (
           <div className="info-note sga-resolution-note">
             <strong>Validação estrita:</strong>{" "}
@@ -242,7 +312,7 @@ export default function SGAPage() {
 
         {eventResolution?.developerDebug && (
           <details className="sga-debug-panel" open>
-            <summary>Diagnóstico técnico V1.39.18 — somente Desenvolvedor</summary>
+            <summary>Diagnóstico técnico V1.39.19 — somente Desenvolvedor</summary>
             <div className="sga-debug-summary">
               <span>Placa alvo <strong>{eventResolution.developerDebug.targetPlate || plate}</strong></span>
               <span>Veículo alvo <strong>{eventResolution.developerDebug.targetVehicleCode || "—"}</strong></span>

@@ -1,0 +1,1 @@
+V1.39.19 - diagnóstico de Desenvolvedor consulta Evento por protocolo conhecido sem alterar o fluxo operacional por placa.

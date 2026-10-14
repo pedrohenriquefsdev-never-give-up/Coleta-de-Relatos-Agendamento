@@ -270,3 +270,13 @@ Esta versão não adiciona novas gravações diretas pelo navegador. As informa�
 
 - `getToken()` agora retorna `Promise<string>` de forma estrita e lança erro de sessão quando o usuário não está disponível.
 - Corrige o erro TS2345 em `AppointmentModal.tsx` sem alterar a lógica da integração SGA da V1.39.16.
+
+
+## V1.39.19 — diagnóstico direto por protocolo
+
+- Adiciona um teste temporário exclusivo da conta Desenvolvedor para consultar `POST listar/evento` diretamente pelo protocolo conhecido do evento de teste.
+- O diagnóstico usa o protocolo apenas para investigação técnica; o fluxo normal do operador continua 100% baseado na placa e nunca exige que o usuário procure ou digite protocolo no SGA.
+- Exibe somente os campos essenciais para diagnóstico: código do evento, protocolo, código do veículo, placa, situação, motivo, cooperativa e regional.
+- Informa separadamente se o protocolo ficou visível para a API e se a placa retornada corresponde exatamente à placa pesquisada.
+- Erros do SGA são exibidos com HTTP/mensagem técnica para separar indisponibilidade do endpoint de ausência do evento no escopo do usuário/token.
+- Nenhuma nova variável de ambiente ou regra de Firestore é necessária.
