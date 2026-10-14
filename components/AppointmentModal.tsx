@@ -322,7 +322,9 @@ export default function AppointmentModal({
           ? `Evento confirmado pelo código interno do veículo${vehicleCode}.`
           : eventData.resolution.resolvedBy === "event_list_exact_plate"
             ? `Evento localizado automaticamente na listagem geral do SGA${vehicleCode}.`
-            : "Evento confirmado diretamente pela placa.");
+            : eventData.resolution.resolvedBy === "plate_exact_legacy_mask"
+              ? `Evento confirmado diretamente pela placa no formato ${eventData.resolution.directPlateLookup || "ABC-1234"}${vehicleCode}.`
+              : "Evento confirmado diretamente pela placa.");
       }
 
       if (!catalogData.checks?.photoTypes?.ok) {

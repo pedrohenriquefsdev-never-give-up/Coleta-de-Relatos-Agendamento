@@ -27,6 +27,7 @@ export async function GET(req: NextRequest) {
         normalizedPlate: result.normalizedPlate,
         vehicleCode: result.vehicleCode || null,
         resolvedBy: result.resolvedBy,
+        directPlateLookup: (result as any).directPlateLookup || null,
         trace: result.trace,
         referenceDate: result.referenceDate || referenceDate || null,
         vehicleContractDate: result.vehicleContractDate || null,

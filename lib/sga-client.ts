@@ -92,6 +92,21 @@ export function normalizeSgaPlate(value: unknown) {
   return String(value || "").toUpperCase().replace(/[^A-Z0-9]/g, "").slice(0, 7);
 }
 
+function sgaEventPlateLookups(normalizedPlate: string) {
+  const lookups: string[] = [];
+
+  // O endpoint de Evento da Hinova documenta placas antigas com hífen
+  // (AAA-1111), enquanto o endpoint de Veículo usa exemplos sem hífen.
+  // Para placas do padrão antigo, testamos primeiro o formato documentado
+  // pelo endpoint de Evento e depois a forma normalizada.
+  if (/^[A-Z]{3}\d{4}$/.test(normalizedPlate)) {
+    lookups.push(`${normalizedPlate.slice(0, 3)}-${normalizedPlate.slice(3)}`);
+  }
+
+  lookups.push(normalizedPlate);
+  return Array.from(new Set(lookups));
+}
+
 export async function listSgaEventsByVehicle(plateOrCode: string | number, timeoutMs = 8000) {
   const lookup = String(plateOrCode || "").trim();
   if (!lookup) throw new Error("SGA_EVENT_LOOKUP_EMPTY");
@@ -839,45 +854,58 @@ export async function resolveSgaEventsByPlate(value: unknown, options: { referen
     }
   }
 
-  // 3) Fallback controlado: consulta direta pela placa. Nas continuações da
-  // busca histórica, pulamos esta etapa para não repetir chamadas já testadas.
-  if (!options.skipDirect && !options.cursorEnd) try {
-    const data = await listSgaEventsByVehicle(normalizedPlate);
-    const rawEvents = eventsFrom(data);
-    const exactEvents = rawEvents.map(normalizeSgaEvent).filter((event) => eventPlateOf(event) === normalizedPlate);
+  // 3) Fallback controlado: consulta direta pela placa. O endpoint de
+  // Evento da documentação da Hinova usa placa antiga com hífen (AAA-1111),
+  // por isso testamos GPV-0000 antes de GPV0000 quando aplicável.
+  // Nas continuações da busca histórica, pulamos esta etapa para não repetir
+  // chamadas já testadas.
+  if (!options.skipDirect && !options.cursorEnd) {
+    const plateLookups = sgaEventPlateLookups(normalizedPlate);
 
-    trace.push({
-      step: "event_by_exact_plate",
-      lookup: `GET listar/evento-veiculo/${normalizedPlate}`,
-      ok: exactEvents.length > 0,
-      message: exactEvents.length > 0
-        ? `${exactEvents.length} evento(s) confirmado(s) pela placa.`
-        : rawEvents.length > 0
-          ? `A consulta retornou eventos, mas nenhum pertence à placa exata ${normalizedPlate}; todos foram descartados.`
-          : `Nenhum evento encontrado diretamente para ${normalizedPlate}.`,
-      returnedPlates: Array.from(new Set(rawEvents.map((event) => eventPlateOf(event)).filter(Boolean))).slice(0, 8),
-    });
+    for (const lookup of plateLookups) {
+      const isMaskedLegacy = lookup !== normalizedPlate;
+      try {
+        const data = await listSgaEventsByVehicle(lookup);
+        const rawEvents = eventsFrom(data);
+        const exactEvents = rawEvents
+          .map(normalizeSgaEvent)
+          .filter((event) => eventPlateOf(event) === normalizedPlate);
 
-    if (exactEvents.length > 0) {
-      const eventVehicleCode = String(exactEvents[0]?.codigo_veiculo ?? "").trim();
-      return {
-        data: withFilteredEvents(data, exactEvents),
-        normalizedPlate,
-        vehicleCode: vehicleCode || eventVehicleCode,
-        vehicle: exactVehicle,
-        resolvedBy: "plate_exact",
-        trace,
-      };
+        trace.push({
+          step: isMaskedLegacy ? "event_by_exact_plate_legacy_mask" : "event_by_exact_plate_normalized",
+          lookup: `GET listar/evento-veiculo/${lookup}`,
+          ok: exactEvents.length > 0,
+          message: exactEvents.length > 0
+            ? `${exactEvents.length} evento(s) confirmado(s) para ${normalizedPlate} usando ${lookup}.`
+            : rawEvents.length > 0
+              ? `A consulta ${lookup} retornou eventos, mas nenhum pertence à placa exata ${normalizedPlate}; todos foram descartados.`
+              : `Nenhum evento encontrado diretamente para ${lookup}.`,
+          returnedPlates: Array.from(new Set(rawEvents.map((event) => eventPlateOf(event)).filter(Boolean))).slice(0, 8),
+        });
+
+        if (exactEvents.length > 0) {
+          const eventVehicleCode = String(exactEvents[0]?.codigo_veiculo ?? "").trim();
+          return {
+            data: withFilteredEvents(data, exactEvents),
+            normalizedPlate,
+            vehicleCode: vehicleCode || eventVehicleCode,
+            vehicle: exactVehicle,
+            resolvedBy: isMaskedLegacy ? "plate_exact_legacy_mask" : "plate_exact",
+            directPlateLookup: lookup,
+            trace,
+          };
+        }
+      } catch (error: any) {
+        lastError = error;
+        trace.push({
+          step: isMaskedLegacy ? "event_by_exact_plate_legacy_mask" : "event_by_exact_plate_normalized",
+          lookup: `GET listar/evento-veiculo/${lookup}`,
+          ok: false,
+          ...(error?.status ? { status: Number(error.status) } : {}),
+          message: String(error?.message || error),
+        });
+      }
     }
-  } catch (error: any) {
-    lastError = error;
-    trace.push({
-      step: "event_by_exact_plate",
-      lookup: `GET listar/evento-veiculo/${normalizedPlate}`,
-      ok: false,
-      ...(error?.status ? { status: Number(error.status) } : {}),
-      message: String(error?.message || error),
-    });
   }
 
   // 4) Fallback automático final: consulta a listagem geral de eventos em

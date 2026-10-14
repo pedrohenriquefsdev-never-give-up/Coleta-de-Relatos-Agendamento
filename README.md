@@ -256,6 +256,16 @@ Esta versão não adiciona novas gravações diretas pelo navegador. As informa�
 - Nenhuma nova variável de ambiente ou regra de Firestore é necessária.
 
 
+
+## V1.39.18 — consulta direta de evento com máscara de placa antiga
+
+- Placas no padrão antigo `ABC1234` passam a ser consultadas primeiro como `ABC-1234` no endpoint `listar/evento-veiculo`, conforme o formato documentado pela API de Evento da Hinova.
+- Se a tentativa com hífen não localizar correspondência exata, o Portal tenta novamente a forma normalizada sem hífen antes de iniciar a busca histórica.
+- Placas Mercosul continuam sendo consultadas no formato normalizado, sem criar máscara incorreta.
+- Todos os retornos continuam sujeitos à validação estrita da placa normalizada antes de serem aceitos.
+- O diagnóstico informa qual variação da placa foi chamada e mantém placas divergentes descartadas.
+- Corrigida a mensagem visual que podia indicar “evento confirmado diretamente pela placa” após uma busca histórica terminar sem evento.
+
 ## V1.39.17 — correção de build TypeScript
 
 - `getToken()` agora retorna `Promise<string>` de forma estrita e lança erro de sessão quando o usuário não está disponível.

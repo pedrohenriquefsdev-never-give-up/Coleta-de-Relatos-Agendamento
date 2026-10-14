@@ -1,0 +1,1 @@
+V1.39.18 - consulta Evento por placa antiga tenta ABC-1234 antes de ABC1234; validação estrita preservada.

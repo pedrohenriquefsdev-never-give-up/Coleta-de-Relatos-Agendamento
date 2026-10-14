@@ -242,7 +242,7 @@ export default function SGAPage() {
 
         {eventResolution?.developerDebug && (
           <details className="sga-debug-panel" open>
-            <summary>Diagnóstico técnico V1.39.17 — somente Desenvolvedor</summary>
+            <summary>Diagnóstico técnico V1.39.18 — somente Desenvolvedor</summary>
             <div className="sga-debug-summary">
               <span>Placa alvo <strong>{eventResolution.developerDebug.targetPlate || plate}</strong></span>
               <span>Veículo alvo <strong>{eventResolution.developerDebug.targetVehicleCode || "—"}</strong></span>
@@ -322,7 +322,7 @@ export default function SGAPage() {
           </details>
         )}
 
-        {eventResolution?.resolvedBy && (
+        {events.length > 0 && eventResolution?.resolvedBy && (
           <div className="info-note sga-resolution-note">
             Placa normalizada: <strong>{eventResolution.normalizedPlate || plate}</strong>
             {eventResolution.vehicleCode ? <> • veículo SGA <strong>{eventResolution.vehicleCode}</strong></> : null}
@@ -333,7 +333,9 @@ export default function SGAPage() {
               ? " • evento confirmado pelo código do veículo"
               : eventResolution.resolvedBy === "event_list_exact_plate"
                 ? " • evento localizado automaticamente na listagem geral do SGA"
-                : " • evento confirmado diretamente pela placa"}.
+                : eventResolution.resolvedBy === "plate_exact_legacy_mask"
+                  ? ` • evento confirmado diretamente pela placa no formato ${eventResolution.directPlateLookup || "ABC-1234"}`
+                  : " • evento confirmado diretamente pela placa"}.
           </div>
         )}
 
