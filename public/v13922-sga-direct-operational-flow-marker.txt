@@ -1,0 +1,1 @@
+V1.39.22 — SGA: fluxo operacional direto placa -> veículo -> código -> eventos; sem data e sem varredura histórica.

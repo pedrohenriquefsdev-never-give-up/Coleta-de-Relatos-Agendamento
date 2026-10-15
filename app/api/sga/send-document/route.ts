@@ -3,7 +3,7 @@ import { FieldValue } from "firebase-admin/firestore";
 import { adminDb } from "@/lib/firebase-admin";
 import { requireUser, isDeveloper } from "@/lib/server-auth";
 import { safeServerError } from "@/lib/server-error";
-import { listSgaEventByProtocol, listSgaPhotoTypes, normalizeSgaPlate, resolveSgaEventsByPlate, uploadSgaEventDocument } from "@/lib/sga-client";
+import { listSgaPhotoTypes, normalizeSgaPlate, resolveSgaEventsByPlate, uploadSgaEventDocument } from "@/lib/sga-client";
 import { loadCallHistoryData } from "@/lib/call-history-data";
 import { buildCallHistoryPdf } from "@/lib/call-history-pdf";
 
@@ -40,9 +40,7 @@ export async function POST(req: NextRequest) {
     const eventCode = String(body.eventCode || "").trim();
     const vehicleCode = String(body.vehicleCode || "").trim();
     const photoTypeCode = String(body.photoTypeCode || "").trim();
-    const eventProtocol = String(body.eventProtocol || "").trim();
     const observation = String(body.observation || "").trim().slice(0, 4000);
-    const referenceDate = String(body.referenceDate || "").trim();
 
     if (!appointmentId || !eventCode || !vehicleCode || !photoTypeCode) {
       return Response.json({ error: "Selecione o evento e a classificação do documento antes de enviar." }, { status: 400 });
@@ -59,22 +57,12 @@ export async function POST(req: NextRequest) {
     const plate = String(report.appointment.plate || "").toUpperCase().replace(/[^A-Z0-9]/g, "");
     if (!plate) return Response.json({ error: "O agendamento não possui uma placa válida." }, { status: 400 });
 
-    // O Portal já conhece o protocolo do evento escolhido. Quando disponível,
-    // revalidamos diretamente pelo protocolo no SGA — sem pedir nada ao usuário
-    // e sem repetir uma varredura histórica extensa antes do upload.
-    let resolvedBy = "protocol_exact";
-    let events: any[] = [];
-    if (eventProtocol) {
-      const protocolData = await listSgaEventByProtocol(eventProtocol);
-      events = eventArray(protocolData);
-    } else {
-      const resolvedEvents = await resolveSgaEventsByPlate(plate, { referenceDate });
-      if ((resolvedEvents as any).pending) {
-        return Response.json({ error: "A validação histórica do evento ainda não foi concluída. Atualize os eventos do SGA e tente novamente." }, { status: 409 });
-      }
-      resolvedBy = resolvedEvents.resolvedBy;
-      events = eventArray(resolvedEvents.data);
-    }
+    // V1.39.22: revalidação curta pelo mesmo fluxo operacional usado na tela:
+    // placa -> veículo exato -> código interno -> eventos do veículo.
+    // Não usamos protocolo como endpoint de busca e não fazemos varredura histórica.
+    const resolvedEvents = await resolveSgaEventsByPlate(plate);
+    const resolvedBy = resolvedEvents.resolvedBy;
+    const events = eventArray(resolvedEvents.data);
     const selectedEvent = events.find((item) => String(item?.codigo_evento ?? item?.codigo ?? "") === eventCode && String(item?.codigo_veiculo ?? item?.veiculo?.codigo ?? "") === vehicleCode);
     const selectedEventPlate = normalizeSgaPlate(selectedEvent?.placa ?? selectedEvent?.veiculo?.placa);
     const selectedEventVehicleCode = String(selectedEvent?.codigo_veiculo ?? selectedEvent?.veiculo?.codigo ?? "").trim();
@@ -182,10 +170,13 @@ export async function POST(req: NextRequest) {
       providerResponse,
     });
   } catch (e: any) {
-    const status = e?.message === "UNAUTHORIZED" ? 401 : e?.message === "FORBIDDEN" ? 403 : 502;
+    const operationalSgaError = ["SGA_EVENT_INCONSISTENT", "SGA_EVENT_NOT_AVAILABLE", "SGA_EXACT_VEHICLE_NOT_FOUND"].includes(String(e?.code || ""));
+    const status = e?.message === "UNAUTHORIZED" ? 401 : e?.message === "FORBIDDEN" ? 403 : operationalSgaError ? 409 : 502;
     const technical = safeServerError(e);
     return Response.json({
-      error: "Não foi possível enviar o histórico ao SGA.",
+      error: operationalSgaError
+        ? "O SGA não conseguiu revalidar com segurança o evento desta placa. Atualize os eventos e tente novamente."
+        : "Não foi possível enviar o histórico ao SGA.",
       technical: status === 502 ? technical.message : undefined,
     }, { status });
   }

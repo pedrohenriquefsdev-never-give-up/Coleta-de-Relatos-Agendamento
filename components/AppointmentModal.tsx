@@ -8,11 +8,6 @@ import Modal from "./Modal";
 import { availableTimesForUser, fitsAvailability } from "@/lib/agenda-availability";
 import type { AgendaAvailability, AppUser, Appointment, AppointmentStatus } from "@/lib/types";
 
-function localReferenceDate() {
-  const now = new Date();
-  return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}-${String(now.getDate()).padStart(2, "0")}`;
-}
-
 const cleanPlate = (v: string) => v.toUpperCase().replace(/[^A-Z0-9]/g, "").slice(0, 7);
 const cleanPhone = (v: string) => v.replace(/\D/g, "").slice(0, 11);
 
@@ -269,27 +264,14 @@ export default function AppointmentModal({
   }
 
   async function fetchSgaEventsAutomatically(token: string, plate: string) {
-    const referenceDate = localReferenceDate();
-    let cursorEnd = "";
-    for (let chunk = 1; chunk <= 40; chunk += 1) {
-      const params = new URLSearchParams({
-        plate,
-        referenceDate,
-        t: String(Date.now()),
-      });
-      if (cursorEnd) params.set("cursorEnd", cursorEnd);
-      const response = await fetch(`/api/sga/event?${params.toString()}`, {
-        headers: { Authorization: `Bearer ${token}` },
-        cache: "no-store",
-      });
-      const data = await response.json().catch(() => ({}));
-      if (!response.ok) throw new Error(`${data.error || "Não foi possível localizar o evento no SGA."}${data.technical ? ` — ${data.technical}` : ""}`);
-      if (!data.pending) return data;
-      const nextCursor = String(data?.resolution?.nextCursorDate || "").trim();
-      if (!nextCursor || nextCursor === cursorEnd) throw new Error("A busca histórica do SGA não informou um próximo período válido.");
-      cursorEnd = nextCursor;
-    }
-    throw new Error("A busca histórica do SGA atingiu o limite de segurança do Portal.");
+    const params = new URLSearchParams({ plate, t: String(Date.now()) });
+    const response = await fetch(`/api/sga/event?${params.toString()}`, {
+      headers: { Authorization: `Bearer ${token}` },
+      cache: "no-store",
+    });
+    const data = await response.json().catch(() => ({}));
+    if (!response.ok) throw new Error(`${data.error || "Não foi possível localizar o evento no SGA."}${data.technical && data.technical !== data.error ? ` — ${data.technical}` : ""}`);
+    return data;
   }
 
   async function loadSgaContext() {
@@ -320,11 +302,7 @@ export default function AppointmentModal({
         const vehicleCode = eventData.resolution?.vehicleCode ? ` • veículo SGA ${eventData.resolution.vehicleCode}` : "";
         setSgaMessage(eventData.resolution.resolvedBy === "vehicle_code_exact"
           ? `Evento confirmado pelo código interno do veículo${vehicleCode}.`
-          : eventData.resolution.resolvedBy === "event_list_exact_plate"
-            ? `Evento localizado automaticamente na listagem geral do SGA${vehicleCode}.`
-            : eventData.resolution.resolvedBy === "plate_exact_legacy_mask"
-              ? `Evento confirmado diretamente pela placa no formato ${eventData.resolution.directPlateLookup || "ABC-1234"}${vehicleCode}.`
-              : "Evento confirmado diretamente pela placa.");
+          : `Evento confirmado diretamente pela placa${vehicleCode}.`);
       }
 
       if (!catalogData.checks?.photoTypes?.ok) {
@@ -386,9 +364,7 @@ export default function AppointmentModal({
           eventCode: event.codigo_evento,
           vehicleCode: event.codigo_veiculo,
           photoTypeCode: selectedSgaPhotoType,
-          eventProtocol: event.protocolo || "",
           observation: form.sgaObservation,
-          referenceDate: localReferenceDate(),
         }),
       });
       const data = await response.json().catch(() => ({}));

@@ -786,40 +786,47 @@ async function lookupEventsInGeneralList(
   };
 }
 
-export async function resolveSgaEventsByPlate(value: unknown, options: { referenceDate?: unknown; cursorEnd?: unknown; skipDirect?: boolean } = {}) {
+export async function resolveSgaEventsByPlate(value: unknown, _options: { referenceDate?: unknown; cursorEnd?: unknown; skipDirect?: boolean } = {}) {
   const normalizedPlate = normalizeSgaPlate(value);
   if (!normalizedPlate) throw new Error("SGA_PLATE_EMPTY");
 
   const trace: SgaResolutionTrace[] = [];
   let lastError: any = null;
-  let exactVehicle: any = null;
-  let vehicleCode = "";
 
-  // 1) Sempre resolvemos o veículo exato. É a âncora de segurança da integração.
+  // V1.39.22: fluxo operacional curto e previsível.
+  // 1) resolve o veículo EXATO pela placa;
+  // 2) usa o código interno retornado pelo SGA para consultar os eventos;
+  // 3) valida novamente a placa de cada evento antes de aceitar.
+  // Não existe mais varredura histórica por data no fluxo normal.
   const vehicleLookup = await lookupVehicleByPlate(normalizedPlate);
   trace.push(...vehicleLookup.trace);
-  exactVehicle = vehicleLookup.vehicle;
-  vehicleCode = vehicleCodeOf(exactVehicle);
-  if (vehicleLookup.error) lastError = vehicleLookup.error;
+  const exactVehicle = vehicleLookup.vehicle;
+  const vehicleCode = vehicleCodeOf(exactVehicle);
 
   if (!exactVehicle) {
     const vehicleError: any = new Error(`Nenhum veículo com correspondência exata para a placa ${normalizedPlate} foi localizado no SGA.`);
     vehicleError.code = "SGA_EXACT_VEHICLE_NOT_FOUND";
-    vehicleError.cause = lastError;
+    vehicleError.cause = vehicleLookup.error;
     vehicleError.trace = trace;
     vehicleError.normalizedPlate = normalizedPlate;
     vehicleError.vehicleCode = "";
     throw vehicleError;
   }
 
-  // 2) Se encontramos o veículo exato, consultamos os eventos pelo código interno
-  // e filtramos novamente para impedir qualquer associação cruzada.
-  if (vehicleCode && !options.skipDirect && !options.cursorEnd) {
-    try {
-      const data = await listSgaEventsByVehicle(vehicleCode);
-      const rawEvents = eventsFrom(data);
-      const exactEvents = rawEvents.filter((event) => eventMatchesPlateOrVehicle(event, normalizedPlate, vehicleCode));
+  let sawInconsistentEvent = false;
 
+  // Caminho principal: o teste com PDH1C46 confirmou que a associação normal do
+  // SGA funciona corretamente quando usamos o código interno do veículo.
+  if (vehicleCode) {
+    try {
+      const data = await listSgaEventsByVehicle(vehicleCode, 12000);
+      const rawEvents = eventsFrom(data);
+      const exactEvents = rawEvents
+        .map(normalizeSgaEvent)
+        .filter((event) => eventMatchesPlateOrVehicle(event, normalizedPlate, vehicleCode));
+      const returnedPlates = Array.from(new Set(rawEvents.map((event) => eventPlateOf(event)).filter(Boolean))).slice(0, 8);
+
+      sawInconsistentEvent = rawEvents.length > 0 && exactEvents.length === 0;
       trace.push({
         step: "event_by_exact_vehicle_code",
         lookup: `GET listar/evento-veiculo/${vehicleCode}`,
@@ -827,14 +834,14 @@ export async function resolveSgaEventsByPlate(value: unknown, options: { referen
         message: exactEvents.length > 0
           ? `${exactEvents.length} evento(s) confirmado(s) para ${normalizedPlate}.`
           : rawEvents.length > 0
-            ? `Eventos retornados pelo código ${vehicleCode} foram descartados por não corresponderem à placa ${normalizedPlate}.`
-            : `Nenhum evento encontrado para o veículo ${vehicleCode}.`,
-        returnedPlates: Array.from(new Set(rawEvents.map((event) => eventPlateOf(event)).filter(Boolean))).slice(0, 8),
+            ? `O SGA retornou evento(s) para o código ${vehicleCode}, mas a placa retornada não corresponde a ${normalizedPlate}.`
+            : `O SGA não retornou eventos para o veículo ${vehicleCode}.`,
+        returnedPlates,
       });
 
       if (exactEvents.length > 0) {
         return {
-          data: withFilteredEvents(data, exactEvents),
+          data: withFilteredEvents(data, dedupeEvents(exactEvents).sort((a, b) => eventSortValue(b) - eventSortValue(a))),
           normalizedPlate,
           vehicleCode,
           vehicle: exactVehicle,
@@ -854,145 +861,64 @@ export async function resolveSgaEventsByPlate(value: unknown, options: { referen
     }
   }
 
-  // 3) Fallback controlado: consulta direta pela placa. O endpoint de
-  // Evento da documentação da Hinova usa placa antiga com hífen (AAA-1111),
-  // por isso testamos GPV-0000 antes de GPV0000 quando aplicável.
-  // Nas continuações da busca histórica, pulamos esta etapa para não repetir
-  // chamadas já testadas.
-  if (!options.skipDirect && !options.cursorEnd) {
-    const plateLookups = sgaEventPlateLookups(normalizedPlate);
+  // Fallback curto: alguns ambientes aceitam a placa diretamente. Para placas
+  // antigas também tentamos o formato documentado AAA-1234. Nenhuma dessas
+  // tentativas dispara listagem geral ou busca por datas.
+  for (const lookup of sgaEventPlateLookups(normalizedPlate)) {
+    try {
+      const data = await listSgaEventsByVehicle(lookup, 10000);
+      const rawEvents = eventsFrom(data);
+      const exactEvents = rawEvents
+        .map(normalizeSgaEvent)
+        .filter((event) => eventPlateOf(event) === normalizedPlate);
+      const returnedPlates = Array.from(new Set(rawEvents.map((event) => eventPlateOf(event)).filter(Boolean))).slice(0, 8);
 
-    for (const lookup of plateLookups) {
-      const isMaskedLegacy = lookup !== normalizedPlate;
-      try {
-        const data = await listSgaEventsByVehicle(lookup);
-        const rawEvents = eventsFrom(data);
-        const exactEvents = rawEvents
-          .map(normalizeSgaEvent)
-          .filter((event) => eventPlateOf(event) === normalizedPlate);
+      if (rawEvents.length > 0 && exactEvents.length === 0) sawInconsistentEvent = true;
+      trace.push({
+        step: "event_by_exact_plate",
+        lookup: `GET listar/evento-veiculo/${lookup}`,
+        ok: exactEvents.length > 0,
+        message: exactEvents.length > 0
+          ? `${exactEvents.length} evento(s) confirmado(s) diretamente para ${normalizedPlate}.`
+          : rawEvents.length > 0
+            ? `A consulta por ${lookup} retornou outra placa; resposta descartada.`
+            : `Nenhum evento retornado diretamente para ${lookup}.`,
+        returnedPlates,
+      });
 
-        trace.push({
-          step: isMaskedLegacy ? "event_by_exact_plate_legacy_mask" : "event_by_exact_plate_normalized",
-          lookup: `GET listar/evento-veiculo/${lookup}`,
-          ok: exactEvents.length > 0,
-          message: exactEvents.length > 0
-            ? `${exactEvents.length} evento(s) confirmado(s) para ${normalizedPlate} usando ${lookup}.`
-            : rawEvents.length > 0
-              ? `A consulta ${lookup} retornou eventos, mas nenhum pertence à placa exata ${normalizedPlate}; todos foram descartados.`
-              : `Nenhum evento encontrado diretamente para ${lookup}.`,
-          returnedPlates: Array.from(new Set(rawEvents.map((event) => eventPlateOf(event)).filter(Boolean))).slice(0, 8),
-        });
-
-        if (exactEvents.length > 0) {
-          const eventVehicleCode = String(exactEvents[0]?.codigo_veiculo ?? "").trim();
-          return {
-            data: withFilteredEvents(data, exactEvents),
-            normalizedPlate,
-            vehicleCode: vehicleCode || eventVehicleCode,
-            vehicle: exactVehicle,
-            resolvedBy: isMaskedLegacy ? "plate_exact_legacy_mask" : "plate_exact",
-            directPlateLookup: lookup,
-            trace,
-          };
-        }
-      } catch (error: any) {
-        lastError = error;
-        trace.push({
-          step: isMaskedLegacy ? "event_by_exact_plate_legacy_mask" : "event_by_exact_plate_normalized",
-          lookup: `GET listar/evento-veiculo/${lookup}`,
-          ok: false,
-          ...(error?.status ? { status: Number(error.status) } : {}),
-          message: String(error?.message || error),
-        });
+      if (exactEvents.length > 0) {
+        return {
+          data: withFilteredEvents(data, dedupeEvents(exactEvents).sort((a, b) => eventSortValue(b) - eventSortValue(a))),
+          normalizedPlate,
+          vehicleCode: vehicleCode || eventVehicleCodeOf(exactEvents[0]),
+          vehicle: exactVehicle,
+          resolvedBy: "plate_exact",
+          directPlateLookup: lookup,
+          trace,
+        };
       }
+    } catch (error: any) {
+      lastError = error;
+      trace.push({
+        step: "event_by_exact_plate",
+        lookup: `GET listar/evento-veiculo/${lookup}`,
+        ok: false,
+        ...(error?.status ? { status: Number(error.status) } : {}),
+        message: String(error?.message || error),
+      });
     }
   }
 
-  // 4) Fallback automático final: consulta a listagem geral de eventos em
-  // janelas de 30 dias e filtra SOMENTE a placa exata. Isso evita exigir que o
-  // operador abra o SGA para descobrir ou digitar protocolo.
-  let generalLookup: any;
-  try {
-    generalLookup = await lookupEventsInGeneralList(normalizedPlate, trace, exactVehicle, options.referenceDate, options.cursorEnd);
-  } catch (error: any) {
-    lastError = error;
-    trace.push({
-      step: "event_general_list_unhandled",
-      lookup: "POST listar/evento",
-      ok: false,
-      ...(error?.status ? { status: Number(error.status) } : {}),
-      message: String(error?.message || error),
-    });
-    generalLookup = {
-      data: null,
-      vehicleCode: "",
-      resolvedBy: "",
-      referenceDate: formatIsoDate(resolveReferenceDate(options.referenceDate)),
-      vehicleContractDate: null,
-      windowsSearched: 0,
-      pending: false,
-      nextCursorDate: null,
-      generalDebug: {
-        targetPlate: normalizedPlate,
-        targetVehicleCode: vehicleCode,
-        requestedPageSizes: [25, 10],
-        requestedWindowDays: [30, 15, 7, 1],
-        effectivePageSize: null,
-        effectiveWindowDays: null,
-        pages: [],
-        attempts: [{ window: "—", windowDays: 0, pageSize: 0, page: 0, ok: false, ...(error?.status ? { status: Number(error.status) } : {}), message: String(error?.message || error) }],
-        capped: false,
-        requestCount: 0,
-        elapsedMs: 0,
-        stoppedReason: "unhandled_error",
-        nextCursorDate: null,
-      },
-    };
-  }
-  if (generalLookup.data) {
-    return {
-      data: generalLookup.data,
-      normalizedPlate,
-      vehicleCode: generalLookup.vehicleCode || vehicleCode,
-      vehicle: exactVehicle,
-      resolvedBy: generalLookup.resolvedBy,
-      trace,
-      referenceDate: generalLookup.referenceDate,
-      vehicleContractDate: generalLookup.vehicleContractDate,
-      windowsSearched: generalLookup.windowsSearched,
-      generalDebug: generalLookup.generalDebug,
-    };
-  }
-
-  if (generalLookup.pending && generalLookup.nextCursorDate) {
-    return {
-      data: null,
-      pending: true,
-      nextCursorDate: generalLookup.nextCursorDate,
-      normalizedPlate,
-      vehicleCode,
-      vehicle: exactVehicle,
-      resolvedBy: "history_continue",
-      trace,
-      referenceDate: generalLookup.referenceDate,
-      vehicleContractDate: generalLookup.vehicleContractDate,
-      windowsSearched: generalLookup.windowsSearched,
-      generalDebug: generalLookup.generalDebug,
-    };
-  }
-
   const finalError: any = new Error(
-    `Nenhum evento com correspondência exata para a placa ${normalizedPlate} foi localizado no SGA.`,
+    sawInconsistentEvent
+      ? `O SGA retornou uma associação inconsistente para o veículo da placa ${normalizedPlate}.`
+      : `O veículo ${normalizedPlate} foi localizado, mas o SGA não disponibilizou um evento correspondente neste momento.`,
   );
-  finalError.code = "SGA_EXACT_EVENT_NOT_FOUND";
+  finalError.code = sawInconsistentEvent ? "SGA_EVENT_INCONSISTENT" : "SGA_EVENT_NOT_AVAILABLE";
   finalError.cause = lastError;
   finalError.trace = trace;
   finalError.normalizedPlate = normalizedPlate;
   finalError.vehicleCode = vehicleCode;
-  finalError.referenceDate = generalLookup.referenceDate;
-  finalError.vehicleContractDate = generalLookup.vehicleContractDate;
-  finalError.windowsSearched = generalLookup.windowsSearched;
-  finalError.generalDebug = generalLookup.generalDebug;
   throw finalError;
 }
 
