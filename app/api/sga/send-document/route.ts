@@ -57,7 +57,7 @@ export async function POST(req: NextRequest) {
     const plate = String(report.appointment.plate || "").toUpperCase().replace(/[^A-Z0-9]/g, "");
     if (!plate) return Response.json({ error: "O agendamento não possui uma placa válida." }, { status: 400 });
 
-    // V1.39.22: revalidação curta pelo mesmo fluxo operacional usado na tela:
+    // V1.39.23: revalidação curta pelo mesmo fluxo operacional usado na tela:
     // placa -> veículo exato -> código interno -> eventos do veículo.
     // Não usamos protocolo como endpoint de busca e não fazemos varredura histórica.
     const resolvedEvents = await resolveSgaEventsByPlate(plate);

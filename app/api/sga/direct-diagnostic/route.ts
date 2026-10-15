@@ -282,7 +282,7 @@ export async function GET(req: NextRequest) {
 
     return Response.json({
       ok: true,
-      version: "1.39.22",
+      version: "1.39.23",
       targetPlate,
       legacyPlate,
       targetVehicleCode: targetVehicleCode || null,

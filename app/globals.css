@@ -2069,6 +2069,11 @@
 .sga-transfer-card>.field{padding:12px 12px 0}
 .sga-observation{min-height:104px}
 .sga-transfer-actions{display:flex;justify-content:flex-end;gap:7px;padding:12px}
+.sga-pdf-review{margin:12px 12px 0;padding:11px 12px;border:1px solid rgba(244,196,0,.22);border-radius:12px;background:rgba(244,196,0,.055);display:flex;align-items:center;justify-content:space-between;gap:12px}
+.sga-pdf-review>div:first-child{display:flex;flex-direction:column;min-width:0}
+.sga-pdf-review strong{font-size:10.5px}
+.sga-pdf-review small{font-size:9px;color:var(--muted);margin-top:3px;line-height:1.45}
+.sga-pdf-review-actions{display:flex;align-items:center;gap:7px;flex:none}
 .sga-transfer-message{margin:0 12px 12px}
 .sga-last-upload{margin:12px 12px 0;border:1px solid rgba(48,155,91,.24);background:rgba(48,155,91,.08);border-radius:12px;padding:9px 10px;display:flex;flex-direction:column;gap:3px}
 .sga-last-upload strong{font-size:9.5px;color:#3d9d67}
@@ -2077,7 +2082,7 @@
 .sga-permission-note{margin-top:12px}
 .sga-status-grid-v1398{grid-template-columns:1.25fr repeat(4,minmax(0,1fr))}
 .sga-catalog-grid-v1398{grid-template-columns:repeat(5,minmax(0,1fr))}
-.sga-event-card-v1398{grid-template-columns:minmax(210px,1.4fr) repeat(5,minmax(110px,1fr))}
+.sga-event-card-v1398{grid-template-columns:minmax(210px,1.4fr) repeat(6,minmax(105px,1fr))}
 @media(max-width:1100px){
   .sga-catalog-grid-v1398{grid-template-columns:repeat(2,minmax(0,1fr))}
   .sga-event-card-v1398{grid-template-columns:1fr 1fr 1fr}
@@ -2086,6 +2091,9 @@
 @media(max-width:720px){
   .sga-transfer-head{align-items:flex-start;flex-direction:column}
   .sga-transfer-grid{grid-template-columns:1fr}
+  .sga-pdf-review{align-items:stretch;flex-direction:column}
+  .sga-pdf-review-actions{width:100%;flex-direction:column}
+  .sga-pdf-review-actions .btn{width:100%;justify-content:center}
   .sga-transfer-actions{justify-content:stretch;flex-direction:column}
   .sga-transfer-actions .btn{width:100%;justify-content:center}
   .sga-status-grid-v1398,.sga-catalog-grid-v1398,.sga-event-card-v1398{grid-template-columns:1fr}

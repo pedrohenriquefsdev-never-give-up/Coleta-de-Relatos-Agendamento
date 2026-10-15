@@ -1,7 +1,7 @@
 "use client";
 
 import { format } from "date-fns";
-import { Copy, Database, Download, History, PhoneCall, RefreshCw, Send, Trash2 } from "lucide-react";
+import { Copy, Database, Download, Eye, History, PhoneCall, RefreshCw, Send, Trash2 } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 import { useSession } from "./AuthGate";
 import Modal from "./Modal";
@@ -51,6 +51,12 @@ type SgaEvent = {
   nome_associado?: string;
   situacao_evento?: string;
   descricao_motivo?: string;
+  data_cadastro_evento?: string;
+  data_cadastro?: string;
+  data_evento?: string;
+  hora_cadastro_evento?: string;
+  hora_cadastro?: string;
+  hora_evento?: string;
 };
 
 type SgaPhotoType = {
@@ -62,6 +68,38 @@ type SgaPhotoType = {
 
 const sgaEventKey = (event: SgaEvent) => `${String(event.codigo_evento ?? "")}:${String(event.codigo_veiculo ?? "")}`;
 const sgaPhotoTypeCode = (item: SgaPhotoType) => String(item.codigo_tipofoto ?? item.codigo ?? "");
+
+function rawSgaEventDate(event: SgaEvent) {
+  return String(event.data_cadastro_evento || event.data_cadastro || event.data_evento || "").trim();
+}
+
+function sgaEventDateValue(event: SgaEvent) {
+  const raw = rawSgaEventDate(event);
+  if (!raw) return 0;
+  const iso = raw.match(/^(\d{4})-(\d{2})-(\d{2})/);
+  if (iso) return Date.UTC(Number(iso[1]), Number(iso[2]) - 1, Number(iso[3]));
+  const br = raw.match(/^(\d{2})\/(\d{2})\/(\d{4})/);
+  if (br) return Date.UTC(Number(br[3]), Number(br[2]) - 1, Number(br[1]));
+  return 0;
+}
+
+function formatSgaEventDate(event: SgaEvent) {
+  const raw = rawSgaEventDate(event);
+  if (!raw) return "Data não informada";
+  const iso = raw.match(/^(\d{4})-(\d{2})-(\d{2})/);
+  if (iso) return `${iso[3]}/${iso[2]}/${iso[1]}`;
+  const br = raw.match(/^(\d{2})\/(\d{2})\/(\d{4})/);
+  if (br) return `${br[1]}/${br[2]}/${br[3]}`;
+  return raw;
+}
+
+function sortSgaEventsNewestFirst(events: SgaEvent[]) {
+  return [...events].sort((a, b) => {
+    const byDate = sgaEventDateValue(b) - sgaEventDateValue(a);
+    if (byDate !== 0) return byDate;
+    return Number(b.codigo_evento || 0) - Number(a.codigo_evento || 0);
+  });
+}
 
 export default function AppointmentModal({
   initial,
@@ -234,22 +272,27 @@ export default function AppointmentModal({
     URL.revokeObjectURL(url);
   }
 
+  async function getCallHistoryPdfBlob() {
+    if (!initial || !user) throw new Error("Agendamento ou sessão não disponível.");
+    const token = await getToken();
+    const response = await fetch(`/api/reports/call-history/pdf`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+      body: JSON.stringify({ appointmentId: initial.id, observation: form.sgaObservation }),
+      cache: "no-store",
+    });
+    if (!response.ok) {
+      const data = await response.json().catch(() => ({}));
+      throw new Error(data.error || "Não foi possível gerar o PDF.");
+    }
+    return response.blob();
+  }
+
   async function exportCallHistoryPdf() {
     if (!initial || !user) return;
     setError("");
     try {
-      const token = await getToken();
-      const response = await fetch(`/api/reports/call-history/pdf`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
-        body: JSON.stringify({ appointmentId: initial.id, observation: form.sgaObservation }),
-        cache: "no-store",
-      });
-      if (!response.ok) {
-        const data = await response.json().catch(() => ({}));
-        throw new Error(data.error || "Não foi possível gerar o PDF.");
-      }
-      const blob = await response.blob();
+      const blob = await getCallHistoryPdfBlob();
       const url = URL.createObjectURL(blob);
       const anchor = document.createElement("a");
       anchor.href = url;
@@ -260,6 +303,35 @@ export default function AppointmentModal({
       URL.revokeObjectURL(url);
     } catch (e) {
       setError(e instanceof Error ? e.message : "Não foi possível gerar o PDF.");
+    }
+  }
+
+  async function previewCallHistoryPdf() {
+    if (!initial || !user) return;
+    if (callAttempts.length === 0) return setError("Faça ao menos uma tentativa de ligação antes de visualizar o PDF.");
+    setError("");
+    const previewWindow = window.open("", "_blank");
+    try {
+      if (previewWindow) {
+        previewWindow.document.title = "Gerando PDF da coleta...";
+        previewWindow.document.body.innerHTML = '<p style="font-family:Arial,sans-serif;padding:24px">Gerando PDF da coleta...</p>';
+      }
+      const blob = await getCallHistoryPdfBlob();
+      const url = URL.createObjectURL(blob);
+      if (previewWindow) previewWindow.location.href = url;
+      else {
+        const anchor = document.createElement("a");
+        anchor.href = url;
+        anchor.target = "_blank";
+        anchor.rel = "noopener noreferrer";
+        document.body.appendChild(anchor);
+        anchor.click();
+        anchor.remove();
+      }
+      window.setTimeout(() => URL.revokeObjectURL(url), 60000);
+    } catch (e) {
+      previewWindow?.close();
+      setError(e instanceof Error ? e.message : "Não foi possível visualizar o PDF.");
     }
   }
 
@@ -294,7 +366,7 @@ export default function AppointmentModal({
       const catalogData = await catalogResponse.json().catch(() => ({}));
       if (!catalogResponse.ok) throw new Error(catalogData.error || "Não foi possível carregar as classificações do SGA.");
 
-      const events = Array.isArray(eventData.data?.eventos) ? eventData.data.eventos as SgaEvent[] : [];
+      const events = sortSgaEventsNewestFirst(Array.isArray(eventData.data?.eventos) ? eventData.data.eventos as SgaEvent[] : []);
       const photoTypes = Array.isArray(catalogData.photoTypes) ? catalogData.photoTypes as SgaPhotoType[] : catalogData.photoTypes ? [catalogData.photoTypes as SgaPhotoType] : [];
       setSgaEvents(events);
       setSgaPhotoTypes(photoTypes);
@@ -868,11 +940,11 @@ export default function AppointmentModal({
                     <option value="">Selecione o evento correto</option>
                     {sgaEvents.map((event, index) => (
                       <option key={`${sgaEventKey(event)}:${index}`} value={sgaEventKey(event)}>
-                        {event.protocolo || "Sem protocolo"} • {event.situacao_evento || "Sem situação"} • {event.descricao_motivo || "Sem motivo"}
+                        {formatSgaEventDate(event)} • {event.protocolo || "Sem protocolo"} • {event.situacao_evento || "Sem situação"} • {event.descricao_motivo || "Sem motivo"}
                       </option>
                     ))}
                   </select>
-                  {sgaEvents.length > 1 && <small className="field-help warning-text">Há mais de um evento para esta placa. Confirme o protocolo antes de enviar.</small>}
+                  {sgaEvents.length > 1 && <small className="field-help warning-text">Eventos ordenados do mais recente para o mais antigo. Confirme a data e o protocolo antes de enviar.</small>}
                 </div>
 
                 <div className="field">
@@ -900,6 +972,21 @@ export default function AppointmentModal({
               <small className="field-help">A observação será incluída no PDF e enviada junto ao documento. Enquanto a API não expõe escrita no campo “Descrição Evento do Veículo”, use “Copiar observação” se também precisar colá-la manualmente no Controle Interno.</small>
             </div>
 
+            <div className="sga-pdf-review">
+              <div>
+                <strong>Conferência do PDF</strong>
+                <small>Visualize o documento que será anexado ao evento antes do envio. O PDF inclui o histórico de ligações e a observação acima.</small>
+              </div>
+              <div className="sga-pdf-review-actions">
+                <button type="button" className="btn compact" onClick={previewCallHistoryPdf} disabled={callAttempts.length === 0}>
+                  <Eye size={13} /> Visualizar PDF
+                </button>
+                <button type="button" className="btn compact" onClick={exportCallHistoryPdf} disabled={callAttempts.length === 0}>
+                  <Download size={13} /> Baixar PDF
+                </button>
+              </div>
+            </div>
+
             <div className="sga-transfer-actions">
               <button type="button" className="btn compact" onClick={copySgaObservation} disabled={!form.sgaObservation.trim()}>
                 <Copy size={13} /> Copiar observação
@@ -910,7 +997,7 @@ export default function AppointmentModal({
                 onClick={sendHistoryToSga}
                 disabled={sendingSga || callAttempts.length === 0 || !selectedSgaEvent || !selectedSgaPhotoType}
               >
-                <Send size={13} /> {sendingSga ? "Enviando..." : "Enviar PDF ao SGA"}
+                <Send size={13} /> {sendingSga ? "Enviando..." : "Anexar PDF ao evento no SGA"}
               </button>
             </div>
 

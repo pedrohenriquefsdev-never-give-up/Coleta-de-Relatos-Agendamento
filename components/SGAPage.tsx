@@ -17,6 +17,26 @@ function asArray(value: any): any[] {
   return [value];
 }
 
+function eventDateValue(event: any) {
+  const raw = String(event?.data_cadastro_evento || event?.data_cadastro || event?.data_evento || "").trim();
+  if (!raw) return 0;
+  const iso = raw.match(/^(\d{4})-(\d{2})-(\d{2})/);
+  if (iso) return Date.UTC(Number(iso[1]), Number(iso[2]) - 1, Number(iso[3]));
+  const br = raw.match(/^(\d{2})\/(\d{2})\/(\d{4})/);
+  if (br) return Date.UTC(Number(br[3]), Number(br[2]) - 1, Number(br[1]));
+  return 0;
+}
+
+function formatEventDate(event: any) {
+  const raw = String(event?.data_cadastro_evento || event?.data_cadastro || event?.data_evento || "").trim();
+  if (!raw) return "—";
+  const iso = raw.match(/^(\d{4})-(\d{2})-(\d{2})/);
+  if (iso) return `${iso[3]}/${iso[2]}/${iso[1]}`;
+  const br = raw.match(/^(\d{2})\/(\d{2})\/(\d{4})/);
+  if (br) return `${br[1]}/${br[2]}/${br[3]}`;
+  return raw;
+}
+
 export default function SGAPage() {
   const { user } = useSession();
   const developer = isPortalDeveloperUid(user?.uid);
@@ -110,7 +130,11 @@ export default function SGAPage() {
     }
   }
 
-  const events = Array.isArray(eventResult?.eventos) ? eventResult.eventos : [];
+  const events = (Array.isArray(eventResult?.eventos) ? eventResult.eventos : []).slice().sort((a: any, b: any) => {
+    const byDate = eventDateValue(b) - eventDateValue(a);
+    if (byDate !== 0) return byDate;
+    return Number(b?.codigo_evento || 0) - Number(a?.codigo_evento || 0);
+  });
   const departments = asArray(diagnostic?.departments);
   const statuses = asArray(diagnostic?.statuses);
   const types = asArray(diagnostic?.types);
@@ -238,6 +262,7 @@ export default function SGAPage() {
             {events.map((event: any, index: number) => (
               <div className="sga-event-card sga-event-card-v1398" key={`${event.codigo_evento || event.protocolo || index}`}>
                 <div><Plate value={event.placa || plate} compact /><strong>{event.nome_associado || "Associado"}</strong></div>
+                <span><small>Data cadastro</small><strong>{formatEventDate(event)}</strong></span>
                 <span><small>Protocolo</small><strong>{event.protocolo || "—"}</strong></span>
                 <span><small>Situação</small><strong>{event.situacao_evento || "—"}</strong></span>
                 <span><small>Motivo</small><strong>{event.descricao_motivo || "—"}</strong></span>
@@ -250,7 +275,7 @@ export default function SGAPage() {
 
         {developer && (
           <details className="sga-debug-panel" style={{ marginTop: 12 }}>
-            <summary>Diagnóstico direto V1.39.22 — fluxo real</summary>
+            <summary>Diagnóstico direto V1.39.23 — fluxo real</summary>
             <div className="sga-debug-structure">
               <span>Teste curto, sem data e sem varredura histórica. Executa somente as chamadas diretas usadas para validar uma placa normal do sistema.</span>
               <div className="sga-search-row">
