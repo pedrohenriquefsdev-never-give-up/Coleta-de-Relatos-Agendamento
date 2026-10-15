@@ -1,3 +1,13 @@
+## V1.39.23 — refinamento de eventos e conferência do PDF
+
+- Eventos do SGA são ordenados do mais recente para o mais antigo, com desempate pelo código do evento.
+- A data do evento/cadastro passa a aparecer nos cards da tela SGA e na seleção de evento dentro do agendamento.
+- Quando houver múltiplos eventos, o operador recebe orientação explícita para conferir data e protocolo antes do envio.
+- A área **Enviar coleta ao SGA** ganha uma etapa visual de **Conferência do PDF**, com botões para visualizar em nova aba e baixar o arquivo antes do upload.
+- O botão final passa a deixar claro que a ação vai **Anexar PDF ao evento no SGA**.
+- O conteúdo enviado continua sendo gerado pelo mesmo endpoint de PDF e revalidado contra placa, veículo e evento antes do upload.
+- Nenhuma nova variável de ambiente, regra de Firestore ou permissão SGA é necessária.
+
 ## V1.39.21 — diagnóstico direto pelos endpoints oficiais do SGA
 
 ## V1.39.22 — SGA direto sem data/histórico
