@@ -1,5 +1,16 @@
 ## V1.39.21 — diagnóstico direto pelos endpoints oficiais do SGA
 
+## V1.39.22 — SGA direto sem data/histórico
+
+- Remove data do teste normal de placa e do diagnóstico direto do Desenvolvedor.
+- Fluxo operacional: placa exata → veículo → código interno → eventos do veículo → validação estrita da placa.
+- Remove a varredura histórica automática do fluxo normal e do modal de agendamento.
+- Revalidação antes do upload do PDF usa o mesmo fluxo direto, sem busca por protocolo e sem histórico.
+- Se o SGA retornar evento de outra placa, o Portal bloqueia por segurança.
+- Se o veículo existir mas o SGA não disponibilizar evento, o Portal informa a indisponibilidade sem disparar dezenas de chamadas.
+- Teste de conexão deixa de solicitar 100 eventos; mantém apenas a chamada mínima de Evento → Listar para reduzir timeout e ruído operacional.
+
+
 - Substitui o diagnóstico por protocolo por um teste direto, curto e exclusivo do Desenvolvedor.
 - Não executa a varredura histórica de eventos.
 - Compara `veiculo/buscar/{placa}/placa` com `veiculo/buscar-por-permissao/{placa}/placa`.
