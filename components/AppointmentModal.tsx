@@ -828,7 +828,7 @@ export default function AppointmentModal({
                 {initial && form.time && !allowedTimes.includes(form.time) && <option value={form.time}>{form.time} • horário atual</option>}
               </select>
             )}
-            {!developerOverride && hasStructuredAvailability && form.assignedTo && allowedTimes.length === 0 && !readOnly && <small className="field-help warning-text">Este responsável não possui horário compatível com a duração selecionada neste dia.</small>}
+            {!developerOverride && hasStructuredAvailability && form.assignedTo && allowedTimes.length === 0 && !readOnly && <small className="field-help warning-text">Este responsável não possui horário liberado neste dia.</small>}
           </div>
           <div className="field">
             <label>Duração</label>

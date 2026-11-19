@@ -40,25 +40,29 @@ import UserManager from "./UserManager";
 import VTCallPage from "./VTCallPage";
 import SGAPage from "./SGAPage";
 
-const hours = [
-  "08:00",
-  "08:30",
-  "09:00",
-  "09:30",
-  "10:00",
-  "10:30",
-  "11:00",
-  "11:30",
-  "13:00",
-  "13:30",
-  "14:00",
-  "14:30",
-  "15:00",
-  "15:30",
-  "16:00",
-  "16:30",
-  "17:00",
-];
+function minutesToTime(total: number): string {
+  const safe = Math.max(0, Math.min(23 * 60 + 59, total));
+  return `${String(Math.floor(safe / 60)).padStart(2, "0")}:${String(safe % 60).padStart(2, "0")}`;
+}
+
+function timeToMinutesLocal(value: string): number {
+  const [hour, minute] = String(value || "").split(":").map(Number);
+  if (!Number.isFinite(hour) || !Number.isFinite(minute)) return -1;
+  return hour * 60 + minute;
+}
+
+function expandCalendarRange(start: string, end: string, stepMinutes = 30): string[] {
+  const startMinutes = timeToMinutesLocal(start);
+  const endMinutes = timeToMinutesLocal(end);
+  if (startMinutes < 0 || endMinutes < startMinutes) return [];
+  const values: string[] = [];
+  for (let cursor = startMinutes; cursor <= endMinutes; cursor += stepMinutes) values.push(minutesToTime(cursor));
+  const explicitEnd = minutesToTime(endMinutes);
+  if (!values.includes(explicitEnd)) values.push(explicitEnd);
+  return values;
+}
+
+const defaultCalendarHours = expandCalendarRange("08:00", "17:00");
 
 const actions: Record<string, string> = {
   LOGIN_SUCCESS: "Login realizado",
@@ -208,6 +212,24 @@ export default function Dashboard() {
   const confirmed = appointments.filter((a) => a.date === today && a.status === "confirmado").length;
   const completed = appointments.filter((a) => a.date === today && (a.status === "atendido" || a.status === "concluido")).length;
   const nextAppointment = todayItems.filter((a) => a.time >= format(new Date(), "HH:mm")).sort((a, b) => a.time.localeCompare(b.time))[0];
+
+  const calendarHours = useMemo(() => {
+    const values = new Set<string>(defaultCalendarHours);
+    const visibleDates = new Set(days.map((day) => format(day, "yyyy-MM-dd")));
+
+    for (const date of visibleDates) {
+      const slots = Array.isArray(availability[date]?.slots) ? availability[date].slots! : [];
+      for (const slot of slots) {
+        for (const time of expandCalendarRange(String(slot.start || ""), String(slot.end || ""))) values.add(time);
+      }
+    }
+
+    for (const appointment of appointments) {
+      if (visibleDates.has(appointment.date) && /^\d{2}:\d{2}$/.test(String(appointment.time || ""))) values.add(appointment.time);
+    }
+
+    return Array.from(values).sort((a, b) => timeToMinutesLocal(a) - timeToMinutesLocal(b));
+  }, [availability, appointments, days]);
 
   if (!profile) return <div className="loading"><div className="spinner" /></div>;
   const currentProfile = profile;
@@ -481,7 +503,7 @@ export default function Dashboard() {
                 })}
               </div>
 
-              {hours.map((h) => (
+              {calendarHours.map((h) => (
                 <div className="cal-row" key={h}>
                   <div className="cal-time">{h}</div>
                   {days.map((d) => {

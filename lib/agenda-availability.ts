@@ -14,7 +14,7 @@ export function normalizeSlot(slot: Partial<AgendaAvailabilitySlot>): AgendaAvai
   if (!assignedTo || !/^\d{2}:\d{2}$/.test(start) || !/^\d{2}:\d{2}$/.test(end)) return null;
   const startMin = timeToMinutes(start);
   const endMin = timeToMinutes(end);
-  if (startMin < 0 || endMin <= startMin) return null;
+  if (startMin < 0 || endMin < startMin) return null;
   return { assignedTo, assignedToName, start, end };
 }
 
@@ -30,12 +30,13 @@ export function fitsAvailability(
   if (slots.length === 0) return true;
 
   const start = timeToMinutes(time);
-  const end = start + Number(durationMinutes || 30);
   if (start < 0) return false;
+  // A disponibilidade representa horários permitidos para INÍCIO da coleta.
+  // Portanto, o último horário informado é inclusivo: 08:00–12:00 libera também 12:00.
   return slots.some((slot) => {
     const normalized = normalizeSlot(slot);
     if (!normalized || normalized.assignedTo !== assignedTo) return false;
-    return start >= timeToMinutes(normalized.start) && end <= timeToMinutes(normalized.end);
+    return start >= timeToMinutes(normalized.start) && start <= timeToMinutes(normalized.end);
   });
 }
 
@@ -44,10 +45,9 @@ export function dateHasTime(availability: AgendaAvailability | null | undefined,
   const slots = Array.isArray(availability.slots) ? availability.slots : [];
   if (slots.length === 0) return true;
   const start = timeToMinutes(time);
-  const end = start + Number(durationMinutes || 30);
   return slots.some((slot) => {
     const normalized = normalizeSlot(slot);
-    return Boolean(normalized && start >= timeToMinutes(normalized.start) && end <= timeToMinutes(normalized.end));
+    return Boolean(normalized && start >= timeToMinutes(normalized.start) && start <= timeToMinutes(normalized.end));
   });
 }
 
@@ -66,11 +66,16 @@ export function availableTimesForUser(
     if (!normalized || normalized.assignedTo !== assignedTo) continue;
     const start = timeToMinutes(normalized.start);
     const end = timeToMinutes(normalized.end);
-    for (let cursor = start; cursor + durationMinutes <= end; cursor += stepMinutes) {
+    for (let cursor = start; cursor <= end; cursor += stepMinutes) {
       const h = String(Math.floor(cursor / 60)).padStart(2, "0");
       const m = String(cursor % 60).padStart(2, "0");
       values.add(`${h}:${m}`);
     }
+    // Se o último horário não cair exatamente no passo de 30 min, ele ainda foi
+    // escolhido explicitamente por quem liberou a agenda e deve aparecer.
+    const endHour = String(Math.floor(end / 60)).padStart(2, "0");
+    const endMinute = String(end % 60).padStart(2, "0");
+    values.add(`${endHour}:${endMinute}`);
   }
   return Array.from(values).sort();
 }

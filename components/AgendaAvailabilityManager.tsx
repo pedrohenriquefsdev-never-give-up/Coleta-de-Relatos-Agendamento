@@ -173,14 +173,14 @@ export default function AgendaAvailabilityManager({
                       {slot.assignedTo && !collectionOperators.some((item) => item.uid === slot.assignedTo) && <option value={slot.assignedTo}>{slot.assignedToName || "Operador atual"} • precisa marcar “Realiza coletas”</option>}
                     </select>
                   </div>
-                  <div className="field"><label>Início</label><input className="input" type="time" value={slot.start} onChange={(e) => updateSlot(index, { start: e.target.value })} /></div>
-                  <div className="field"><label>Fim</label><input className="input" type="time" value={slot.end} onChange={(e) => updateSlot(index, { end: e.target.value })} /></div>
+                  <div className="field"><label>Primeiro horário</label><input className="input" type="time" step={60} value={slot.start} onChange={(e) => updateSlot(index, { start: e.target.value })} /></div>
+                  <div className="field"><label>Último horário</label><input className="input" type="time" step={60} value={slot.end} onChange={(e) => updateSlot(index, { end: e.target.value })} /></div>
                   <button className="btn icon-only danger ghost slot-remove" title="Remover período" onClick={() => setSlots((current) => current.filter((_, i) => i !== index))}><Trash2 size={15} /></button>
                 </div>
               ))}
             </div>
           )}
-          <div className="availability-footnote">A disponibilidade pertence ao operador da coleta, não a quem cria o agendamento. Ex.: Samuel pode ter 13:00-17:00 liberado e Thamyres/Nataly poderão usar esses horários ao agendar uma coleta para ele.</div>
+          <div className="availability-footnote">A disponibilidade pertence ao operador da coleta, não a quem cria o agendamento. O último horário é inclusivo: por exemplo, 08:00–12:00 libera também um agendamento iniciando às 12:00. Você pode informar qualquer horário, inclusive 12:00, 12:30 ou outro horário necessário.</div>
         </div>
       )}
     </div>
