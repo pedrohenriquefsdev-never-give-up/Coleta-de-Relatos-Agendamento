@@ -1,3 +1,13 @@
+## V1.39.24 — horários livres sem bloqueio de almoço
+
+- Remove a lacuna fixa de 12:00 e 12:30 da grade semanal.
+- A grade passa a montar os horários dinamicamente, mantendo 08:00–17:00 como base e incluindo automaticamente qualquer horário liberado ou já agendado fora desse intervalo.
+- A disponibilidade passa a representar horários permitidos para **início** da coleta: o último horário informado é inclusivo. Ex.: 08:00–12:00 libera também 12:00.
+- Quem gerencia a disponibilidade pode informar qualquer horário no campo de hora, inclusive 12:00, 12:30 ou horários fora do padrão; primeiro e último horário também podem ser iguais para liberar apenas um horário específico.
+- O backend usa a mesma regra inclusiva, evitando que a interface mostre um horário que depois seja rejeitado ao salvar o agendamento.
+- Conflitos entre coletas continuam sendo bloqueados normalmente pela duração real de cada agendamento.
+- Nenhuma nova variável de ambiente ou regra de Firestore é necessária.
+
 ## V1.39.23 — refinamento de eventos e conferência do PDF
 
 - Eventos do SGA são ordenados do mais recente para o mais antigo, com desempate pelo código do evento.
